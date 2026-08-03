@@ -24,7 +24,6 @@ Some of these files are trickier to reverse, and I’ll work through them in my 
 
 Still missing:
 
-- `mouse_input.pyc`
 - `overlay.pyc`
 - `overlay_server.pyc`
 - `runner.pyc`
