@@ -1,0 +1,11 @@
+{
+  "version": "1.4.6",
+  "ko_fi_url": "https://ko-fi.com/segueapp",
+  "installer_url": "https://github.com/Segueapp/segue-releases/raw/main/releases/latest/Segue_Setup.exe",
+  "headline": "Drive-only overlay + controller mapping",
+  "cta_label": "",
+  "color": "#EFB02C,#D98E0C",
+  "changelog_url": "",
+  "image_url": "asset:whatsnew_146_hero.png",
+  "notes": "[[title:What's new]]\n[[new]] <span style='color:#ffffff;font-weight:bold'>Drive-only overlay.</span> Show the overlay only while you're actually driving. It hides in menus, the garage, and pauses.\n[[img:asset:wn_146_driveonly.png]]\n[[new]] <span style='color:#ffffff;font-weight:bold'>Start with Windows.</span> New toggle in Preferences to launch Segue on boot.\n[[img:asset:wn_146_startup.png]]\n[[improved]] <span style='color:#ffffff;font-weight:bold'>Volume ramp speed.</span> A sensitivity slider for how fast the volume moves while you hold a volume button (Xbox and wheel).\n[[img:asset:wn_146_volume.png]]\n[[improved]] <span style='color:#ffffff;font-weight:bold'>Tap and hold, either way.</span> Bind track-change and volume to tap or hold in whichever combination you like. Both directions work now.\n[[improved]] <span style='color:#ffffff;font-weight:bold'>Menu music.</span> The music now stays quiet through the whole garage, map and pause, and comes back only once you actually drive off. Pressing the gas no longer pops it back early.\n[[sub:Smaller fixes]]\n[[fix]] <span style='color:#ffffff;font-weight:bold'>Menu volume.</span> The D-pad no longer nudges the volume while you navigate a menu.\n[[fix]] <span style='color:#ffffff;font-weight:bold'>Per-app volume.</span> Works on non-default audio devices and Microsoft Store apps now.\n[[fix]] <span style='color:#ffffff;font-weight:bold'>Info hover.</span> The info tooltip no longer double-pops or changes size when the mouse moves slightly.\n[[fix]] <span style='color:#ffffff;font-weight:bold'>Xbox Controls flash.</span> No more white flash when opening Controls.\nMore polish under the hood. ❤️"
+}

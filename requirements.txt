@@ -1,0 +1,13 @@
+PySide6
+numpy
+onnxruntime
+pycaw
+comtypes
+psutil
+hidapi
+pyaudiowpatch
+pygame
+pydualsense
+Pillow
+winsdk
+webrtcvad-wheels
