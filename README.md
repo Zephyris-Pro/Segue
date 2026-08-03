@@ -28,7 +28,6 @@ Still missing:
 - `overlay_server.pyc`
 - `runner.pyc`
 - `settings.pyc`
-- `source_launch.pyc`
 - `wheel_hid.pyc`
 
 ***
