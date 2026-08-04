@@ -24,12 +24,10 @@ Some of these files are trickier to reverse, and I’ll work through them in my 
 
 Still missing:
 
-- `overlay.pyc`
 - `overlay_server.pyc`
-- `runner.pyc`
 - `settings.pyc`
 - `wheel_hid.pyc`
-
+ 
 ***
 
 All credit goes to the original Segue creator. I claim none of it.
