@@ -24,9 +24,7 @@ Some of these files are trickier to reverse, and I’ll work through them in my 
 
 Still missing:
 
-- `overlay_server.pyc`
 - `settings.pyc`
-- `wheel_hid.pyc`
  
 ***
 
