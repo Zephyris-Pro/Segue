@@ -1,5 +1,8 @@
 # Segue Decompilation Project
 
+> [!WARNING]  
+> This is not the real project. The actual project can be found here: [Segueapp/segue-releases](https://github.com/Segueapp/segue-releases)
+
 ## Why does this project exist?
 
 I'm a big fan of the Forza Horizon franchise and always wanted a ban-safe app that lets me play music from Spotify or YouTube in an immersive way.
@@ -22,9 +25,10 @@ I can claim the code matches the original because the bytecode of the decompiled
 
 Some of these files are trickier to reverse, and I’ll work through them in my spare time.
 
-Still missing:
+~~Still missing:~~
 
-- `settings.pyc`
+> [!IMPORTANT]
+> Despite the tests I have carried out, it is possible that the decompilation is not perfect and could still contain bugs. A broader range of tests, or people dedicated to this task, would be needed, and their help would be appreciated.
  
 ***
 
