@@ -12,15 +12,23 @@ yields zeros and the overlay falls back to its canned animation. Never raises.
 COM rule (see proc_capture): the capture object is constructed AND iterated on
 this module's own worker thread - never hand it to another thread.
 """
+
 from __future__ import annotations
 import threading
 import time
+
 _RATE = 16000
 _CH = 1
 _FFT_N = 1024
 _N_BANDS = 12
 _F_LO, _F_HI = (40.0, 7000.0)
-_KA = (1.53512485958697, -2.69169618940638, 1.19839281085285, -1.69065929318241, 0.73248077421585)
+_KA = (
+    1.53512485958697,
+    -2.69169618940638,
+    1.19839281085285,
+    -1.69065929318241,
+    0.73248077421585,
+)
 _KB = (1.0, -2.0, 1.0, -1.99004745483398, 0.99007225036621)
 _LUFS_ST_S = 3.0
 _LUFS_MOM_S = 0.4
@@ -30,24 +38,27 @@ _LUFS_CALIB_LU = 0.0
 def _music_proc(cfg):
     """Image name of the running music-source process, or None. (Standalone copy
     of the visualizer's helper so this module is independent of it.)"""
-    src = getattr(cfg, 'source', 'spotify')
-    if src == 'browser':
-        cands = getattr(cfg, 'browser_process_names', ())
-    elif src == 'applemusic':
-        cands = getattr(cfg, 'applemusic_process_names', ())
-    elif src == 'localmedia':
-        cands = getattr(cfg, 'localmedia_process_names', ())
-    elif src == 'tidal':
-        cands = getattr(cfg, 'tidal_process_names', ('TIDAL.exe',))
-    elif src == 'amazonmusic':
-        cands = getattr(cfg, 'amazonmusic_process_names', ('Amazon Music.exe',))
-    elif src == 'ytmusic':
-        cands = getattr(cfg, 'ytmusic_process_names', ('YouTube Music.exe',))
+    src = getattr(cfg, "source", "spotify")
+    if src == "browser":
+        cands = getattr(cfg, "browser_process_names", ())
+    elif src == "applemusic":
+        cands = getattr(cfg, "applemusic_process_names", ())
+    elif src == "localmedia":
+        cands = getattr(cfg, "localmedia_process_names", ())
+    elif src == "tidal":
+        cands = getattr(cfg, "tidal_process_names", ("TIDAL.exe",))
+    elif src == "amazonmusic":
+        cands = getattr(cfg, "amazonmusic_process_names", ("Amazon Music.exe",))
+    elif src == "ytmusic":
+        cands = getattr(cfg, "ytmusic_process_names", ("YouTube Music.exe",))
     else:
-        cands = (getattr(cfg, 'spotify_process_name', 'Spotify.exe'),)
+        cands = (getattr(cfg, "spotify_process_name", "Spotify.exe"),)
     try:
         import psutil
-        running = {(p.info.get('name') or '').lower() for p in psutil.process_iter(['name'])}
+
+        running = {
+            (p.info.get("name") or "").lower() for p in psutil.process_iter(["name"])
+        }
     except Exception:
         return None
     for c in cands:
@@ -70,7 +81,9 @@ class OverlayBars:
         self.lufs_s = None
         self.lufs_m = None
         self.excite = 0.0
-        self._thread = threading.Thread(target=self._run, name='segue-overlay-bars', daemon=True)
+        self._thread = threading.Thread(
+            target=self._run, name="segue-overlay-bars", daemon=True
+        )
         self._thread.start()
 
     def stop(self):
@@ -126,7 +139,9 @@ class OverlayBars:
                     self._decay()
                     time.sleep(1.0)
                     continue
-                cap = ProcessLoopbackCapture(proc, sample_rate=_RATE, channels=_CH, frame_ms=20)
+                cap = ProcessLoopbackCapture(
+                    proc, sample_rate=_RATE, channels=_CH, frame_ms=20
+                )
                 self.alive = True
                 last = time.monotonic()
                 try:
@@ -134,17 +149,25 @@ class OverlayBars:
                         if self._stop:
                             break
                         if not frame:
-                            if time.monotonic() - last > 3.0 or _music_proc(self._cfg) != proc:
+                            if (
+                                time.monotonic() - last > 3.0
+                                or _music_proc(self._cfg) != proc
+                            ):
                                 break
                             self._decay(0.85)
                             continue
                         last = time.monotonic()
-                        pcm = np.frombuffer(frame, dtype=np.int16).astype(np.float32) / 32768.0
+                        pcm = (
+                            np.frombuffer(frame, dtype=np.int16).astype(np.float32)
+                            / 32768.0
+                        )
                         if _CH > 1:
                             pcm = pcm.reshape(-1, _CH).mean(axis=1)
                         _pcm_lufs = pcm
                         try:
-                            _applied = float(self._ui.get('applied', 1.0)) if self._ui else 1.0
+                            _applied = (
+                                float(self._ui.get("applied", 1.0)) if self._ui else 1.0
+                            )
                         except Exception:
                             _applied = 1.0
                         if _applied > 0.001 and _applied < 0.999:
@@ -153,15 +176,33 @@ class OverlayBars:
                         kB0, kB1, kB2, kB3, kB4 = _KB
                         _acc = float(acc)
                         _accN = accN
-                        ax1, ax2, ay1, ay2 = (float(ka_s[0]), float(ka_s[1]), float(ka_s[2]), float(ka_s[3]))
-                        bx1, bx2, by1, by2 = (float(kb_s[0]), float(kb_s[1]), float(kb_s[2]), float(kb_s[3]))
+                        ax1, ax2, ay1, ay2 = (
+                            float(ka_s[0]),
+                            float(ka_s[1]),
+                            float(ka_s[2]),
+                            float(ka_s[3]),
+                        )
+                        bx1, bx2, by1, by2 = (
+                            float(kb_s[0]),
+                            float(kb_s[1]),
+                            float(kb_s[2]),
+                            float(kb_s[3]),
+                        )
                         for _x in _pcm_lufs:
-                            _yA = kA0 * _x + kA1 * ax1 + kA2 * ax2 - kA3 * ay1 - kA4 * ay2
+                            _yA = (
+                                kA0 * _x + kA1 * ax1 + kA2 * ax2 - kA3 * ay1 - kA4 * ay2
+                            )
                             ax2 = ax1
                             ax1 = float(_x)
                             ay2 = ay1
                             ay1 = _yA
-                            _yB = kB0 * _yA + kB1 * bx1 + kB2 * bx2 - kB3 * by1 - kB4 * by2
+                            _yB = (
+                                kB0 * _yA
+                                + kB1 * bx1
+                                + kB2 * bx2
+                                - kB3 * by1
+                                - kB4 * by2
+                            )
                             bx2 = bx1
                             bx1 = _yA
                             by2 = by1
@@ -182,8 +223,16 @@ class OverlayBars:
                                 _accN = 0
                                 mM = float(mBuf[:mFill].mean()) if mFill else 0.0
                                 mS = float(sBuf[:sFill].mean()) if sFill else 0.0
-                                lM = -0.691 + 10.0 * float(np.log10(mM)) if mM > 1e-12 else None
-                                lS = -0.691 + 10.0 * float(np.log10(mS)) if mS > 1e-12 else None
+                                lM = (
+                                    -0.691 + 10.0 * float(np.log10(mM))
+                                    if mM > 1e-12
+                                    else None
+                                )
+                                lS = (
+                                    -0.691 + 10.0 * float(np.log10(mS))
+                                    if mS > 1e-12
+                                    else None
+                                )
                                 if lM is not None:
                                     lM += _LUFS_CALIB_LU
                                 if lS is not None:
@@ -220,18 +269,30 @@ class OverlayBars:
                         buf = np.concatenate((buf, pcm))
                         while len(buf) >= _FFT_N:
                             chunk = buf[:_FFT_N]
-                            buf = buf[_FFT_N // 2:]
+                            buf = buf[_FFT_N // 2 :]
                             silent = float(np.max(np.abs(chunk))) < 0.0015
                             mag = np.abs(np.fft.rfft(chunk * win))
-                            raw = np.array([float(mag[ix].mean()) for ix in idx], dtype=np.float32)
+                            raw = np.array(
+                                [float(mag[ix].mean()) for ix in idx], dtype=np.float32
+                            )
                             gref = max(gref * 0.99, float(raw.max()), 1e-05)
                             floor = gref * 0.05
                             for i in range(_N_BANDS):
                                 if silent:
                                     nv = 0.0
                                 else:
-                                    bref[i] = max(float(bref[i]) * 0.985, float(raw[i]), floor)
-                                    nv = min(1.0, float(raw[i]) / float(bref[i]) * (1.0 + 0.05 * i)) ** 0.7
+                                    bref[i] = max(
+                                        float(bref[i]) * 0.985, float(raw[i]), floor
+                                    )
+                                    nv = (
+                                        min(
+                                            1.0,
+                                            float(raw[i])
+                                            / float(bref[i])
+                                            * (1.0 + 0.05 * i),
+                                        )
+                                        ** 0.7
+                                    )
                                 a = 0.7 if nv > smooth[i] else 0.22
                                 smooth[i] += (nv - smooth[i]) * a
                             self.levels = [round(float(v), 3) for v in smooth]

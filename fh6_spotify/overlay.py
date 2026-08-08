@@ -7,37 +7,53 @@ bar. Fades in on change, fades out when idle. Muted (menu) -> cover + mute icon.
 Qt runs on the main thread; the radio loop runs in a worker thread and feeds
 state via get_state(). Media (cover/title/state) comes from MediaWatcher.
 """
+
 import ctypes
 from ctypes import wintypes
 import os
 import threading
 import time
 import urllib.request
-_CDBG = bool(os.environ.get('SEGUE_CAROUSEL_DBG'))
-_CDBG_PATH = os.path.join(os.path.dirname(__file__), '..', 'scripts', '.carousel_dbg.log')
+
+_CDBG = bool(os.environ.get("SEGUE_CAROUSEL_DBG"))
+_CDBG_PATH = os.path.join(
+    os.path.dirname(__file__), "..", "scripts", ".carousel_dbg.log"
+)
 
 
 def _clog(msg):
     if not _CDBG:
         return None
     try:
-        with open(_CDBG_PATH, 'a', encoding='utf-8') as f:
-            f.write('{:.3f} {}\n'.format(time.time(), msg))
+        with open(_CDBG_PATH, "a", encoding="utf-8") as f:
+            f.write("{:.3f} {}\n".format(time.time(), msg))
     except Exception:
         return None
 
 
 from PySide6.QtCore import Qt, QTimer, QRectF, QPointF
-from PySide6.QtGui import QColor, QFont, QFontMetrics, QGuiApplication, QImage, QLinearGradient, QPainter, QPainterPath, QPen, QPixmap
+from PySide6.QtGui import (
+    QColor,
+    QFont,
+    QFontMetrics,
+    QGuiApplication,
+    QImage,
+    QLinearGradient,
+    QPainter,
+    QPainterPath,
+    QPen,
+    QPixmap,
+)
 from PySide6.QtWidgets import QWidget
 from PIL import Image, ImageFilter
+
 _W, _H = (352, 132)
 _COVER = 104
 _PAD = 16
 _BADGE_R = 19
 _CR = 18
 _LINGER_S = 3.5
-_FONT = 'Inter'
+_FONT = "Inter"
 _WHITE = QColor(255, 255, 255)
 _DIM = QColor(222, 222, 230)
 _TILE = 60
@@ -49,23 +65,32 @@ _SKIP_WIN = 3.0
 _GOTO_SETTLE = 0.45
 
 
-def _overlay_xy(position: str, screen_w: int, screen_h: int, w: int, h: int, margin: int=64, custom_x: float=-1.0, custom_y: float=-1.0) -> tuple[int, int]:
+def _overlay_xy(
+    position: str,
+    screen_w: int,
+    screen_h: int,
+    w: int,
+    h: int,
+    margin: int = 64,
+    custom_x: float = -1.0,
+    custom_y: float = -1.0,
+) -> tuple[int, int]:
     if 0.0 <= custom_x <= 1.0 and 0.0 <= custom_y <= 1.0:
         x = int(custom_x * (screen_w - w))
         y = int(custom_y * (screen_h - h))
         x = max(0, min(screen_w - w, x))
         y = max(0, min(screen_h - h, y))
         return (x, y)
-    if position.endswith('_right'):
+    if position.endswith("_right"):
         x = screen_w - w - margin
-    elif position.endswith('_center'):
+    elif position.endswith("_center"):
         x = (screen_w - w) // 2
     else:
         x = margin
-    if position.startswith('top_'):
+    if position.startswith("top_"):
         y = margin
         return (x, y)
-    if position.startswith('bottom_'):
+    if position.startswith("bottom_"):
         y = screen_h - h - margin
         return (x, y)
     y = (screen_h - h) // 2
@@ -83,7 +108,14 @@ class _SnapGuides(QWidget):
     Purely visual - the magnetism lives in the overlay's mouseMoveEvent."""
 
     def __init__(self, screen):
-        super().__init__(None, Qt.FramelessWindowHint | Qt.Tool | Qt.WindowStaysOnTopHint | Qt.WindowTransparentForInput | Qt.NoDropShadowWindowHint)
+        super().__init__(
+            None,
+            Qt.FramelessWindowHint
+            | Qt.Tool
+            | Qt.WindowStaysOnTopHint
+            | Qt.WindowTransparentForInput
+            | Qt.NoDropShadowWindowHint,
+        )
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
         self.setGeometry(screen.geometry())
@@ -112,11 +144,19 @@ class _MoveHint(QWidget):
     """Hint shown while move mode is active: a drawn Shift keycap (with the
     ⇧ outline arrow) + "to snap". Click-through, bottom-center of the
     overlay's screen (above the taskbar); place() follows screen changes."""
-    _KEY = 'Shift'
-    _TEXT = 'to snap'
+
+    _KEY = "Shift"
+    _TEXT = "to snap"
 
     def __init__(self, screen):
-        super().__init__(None, Qt.FramelessWindowHint | Qt.Tool | Qt.WindowStaysOnTopHint | Qt.WindowTransparentForInput | Qt.NoDropShadowWindowHint)
+        super().__init__(
+            None,
+            Qt.FramelessWindowHint
+            | Qt.Tool
+            | Qt.WindowStaysOnTopHint
+            | Qt.WindowTransparentForInput
+            | Qt.NoDropShadowWindowHint,
+        )
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
         self._fkey = QFont(_FONT, 19)
@@ -149,12 +189,15 @@ class _MoveHint(QWidget):
         if avail == self._geo:
             return None
         self._geo = avail
-        self.move(avail.x() + (avail.width() - self.width()) // 2, avail.y() + avail.height() - self.height() - 36)
+        self.move(
+            avail.x() + (avail.width() - self.width()) // 2,
+            avail.y() + avail.height() - self.height() - 36,
+        )
 
     def paintEvent(self, e):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
-        p.setPen(QPen(QColor('#3a3a38'), 1))
+        p.setPen(QPen(QColor("#3a3a38"), 1))
         p.setBrush(QColor(42, 42, 40, 235))
         p.drawRoundedRect(QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5), 14, 14)
         pad = 20
@@ -162,8 +205,8 @@ class _MoveHint(QWidget):
         p.setPen(Qt.NoPen)
         p.setBrush(QColor(0, 0, 0, 90))
         p.drawRoundedRect(key.adjusted(0, 3, 0, 3), 10, 10)
-        p.setPen(QPen(QColor('#c9c9c7'), 1))
-        p.setBrush(QColor('#f0f0f0'))
+        p.setPen(QPen(QColor("#c9c9c7"), 1))
+        p.setBrush(QColor("#f0f0f0"))
         p.drawRoundedRect(key, 10, 10)
         aw = self._arrow_w
         ax = key.x() + 18
@@ -181,15 +224,21 @@ class _MoveHint(QWidget):
         path.lineTo(mid - stem / 2, wing_y)
         path.lineTo(ax, wing_y)
         path.closeSubpath()
-        p.setPen(QPen(QColor('#1f1f1e'), 2.4, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+        p.setPen(QPen(QColor("#1f1f1e"), 2.4, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
         p.setBrush(Qt.NoBrush)
         p.drawPath(path)
-        p.setPen(QColor('#1f1f1e'))
+        p.setPen(QColor("#1f1f1e"))
         p.setFont(self._fkey)
-        p.drawText(QRectF(ax + aw + 10, key.y(), key.right() - (ax + aw + 10), key.height()), Qt.AlignVCenter | Qt.AlignLeft, self._KEY)
-        p.setPen(QColor('#c2c2c0'))
+        p.drawText(
+            QRectF(ax + aw + 10, key.y(), key.right() - (ax + aw + 10), key.height()),
+            Qt.AlignVCenter | Qt.AlignLeft,
+            self._KEY,
+        )
+        p.setPen(QColor("#c2c2c0"))
         p.setFont(self._ftxt)
-        txt = QRectF(key.right() + 14, 0, self.width() - key.right() - 14 - pad, self.height())
+        txt = QRectF(
+            key.right() + 14, 0, self.width() - key.right() - 14 - pad, self.height()
+        )
         p.drawText(txt, Qt.AlignVCenter | Qt.AlignLeft, self._TEXT)
 
 
@@ -197,10 +246,18 @@ class _BrowseHint(QWidget):
     """Small pill shown below the cover-only overlay while hovering: tells you to just
     scroll (no button) to browse. The small cover window has no room for an inline hint,
     so this floats under it. Click-through, fades (opacity driven by the overlay)."""
-    _TEXT = '↕  Scroll to browse'
+
+    _TEXT = "↕  Scroll to browse"
 
     def __init__(self):
-        super().__init__(None, Qt.FramelessWindowHint | Qt.Tool | Qt.WindowStaysOnTopHint | Qt.WindowTransparentForInput | Qt.NoDropShadowWindowHint)
+        super().__init__(
+            None,
+            Qt.FramelessWindowHint
+            | Qt.Tool
+            | Qt.WindowStaysOnTopHint
+            | Qt.WindowTransparentForInput
+            | Qt.NoDropShadowWindowHint,
+        )
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
         self._f = QFont(_FONT, 10)
@@ -210,16 +267,18 @@ class _BrowseHint(QWidget):
         self.show()
 
     def place(self, anchor) -> None:
-        self.move(anchor.x() + (anchor.width() - self.width()) // 2, anchor.bottom() + 6)
+        self.move(
+            anchor.x() + (anchor.width() - self.width()) // 2, anchor.bottom() + 6
+        )
 
     def paintEvent(self, e):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
-        p.setPen(QPen(QColor('#3a3a38'), 1))
+        p.setPen(QPen(QColor("#3a3a38"), 1))
         p.setBrush(QColor(42, 42, 40, 235))
         p.drawRoundedRect(QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5), 11, 11)
         p.setFont(self._f)
-        p.setPen(QColor('#e8e8e6'))
+        p.setPen(QColor("#e8e8e6"))
         p.drawText(self.rect(), Qt.AlignCenter, self._TEXT)
 
 
@@ -227,10 +286,18 @@ class _ShortcutHud(QWidget):
     """Cheat-sheet shown while the side button is held + you hesitate: the music
     gestures, as light keycaps (matching the 'Shift to snap' hint). Click-through,
     bottom-center, fades in/out (opacity driven by the overlay)."""
-    _ROWS = [('Scroll', 'Volume'), ('Left / Right', 'Prev / Next'), ('Space', 'Pause')]
+
+    _ROWS = [("Scroll", "Volume"), ("Left / Right", "Prev / Next"), ("Space", "Pause")]
 
     def __init__(self, screen):
-        super().__init__(None, Qt.FramelessWindowHint | Qt.Tool | Qt.WindowStaysOnTopHint | Qt.WindowTransparentForInput | Qt.NoDropShadowWindowHint)
+        super().__init__(
+            None,
+            Qt.FramelessWindowHint
+            | Qt.Tool
+            | Qt.WindowStaysOnTopHint
+            | Qt.WindowTransparentForInput
+            | Qt.NoDropShadowWindowHint,
+        )
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
         self._fk = QFont(_FONT, 12)
@@ -245,7 +312,11 @@ class _ShortcutHud(QWidget):
         self._rgap = 10
         self._gap = 18
         w = self._pad * 2 + self._maxcap + self._gap + self._aw
-        h = self._pad * 2 + self._caph * len(self._ROWS) + self._rgap * (len(self._ROWS) - 1)
+        h = (
+            self._pad * 2
+            + self._caph * len(self._ROWS)
+            + self._rgap * (len(self._ROWS) - 1)
+        )
         self.resize(w, h)
         self._geo = None
         self.place(screen)
@@ -258,12 +329,15 @@ class _ShortcutHud(QWidget):
         if avail == self._geo:
             return None
         self._geo = avail
-        self.move(avail.x() + (avail.width() - self.width()) // 2, avail.y() + avail.height() - self.height() - 36)
+        self.move(
+            avail.x() + (avail.width() - self.width()) // 2,
+            avail.y() + avail.height() - self.height() - 36,
+        )
 
     def paintEvent(self, e):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
-        p.setPen(QPen(QColor('#3a3a38'), 1))
+        p.setPen(QPen(QColor("#3a3a38"), 1))
         p.setBrush(QColor(42, 42, 40, 235))
         p.drawRoundedRect(QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5), 14, 14)
         ax = self._pad + self._maxcap + self._gap
@@ -273,15 +347,17 @@ class _ShortcutHud(QWidget):
             p.setPen(Qt.NoPen)
             p.setBrush(QColor(0, 0, 0, 90))
             p.drawRoundedRect(cap.adjusted(0, 2.5, 0, 2.5), 8, 8)
-            p.setPen(QPen(QColor('#c9c9c7'), 1))
-            p.setBrush(QColor('#f0f0f0'))
+            p.setPen(QPen(QColor("#c9c9c7"), 1))
+            p.setBrush(QColor("#f0f0f0"))
             p.drawRoundedRect(cap, 8, 8)
-            p.setPen(QColor('#1f1f1e'))
+            p.setPen(QColor("#1f1f1e"))
             p.setFont(self._fk)
             p.drawText(cap, Qt.AlignCenter, k)
-            p.setPen(QColor('#e8e8e6'))
+            p.setPen(QColor("#e8e8e6"))
             p.setFont(self._fa)
-            p.drawText(QRectF(ax, y, self._aw, self._caph), Qt.AlignVCenter | Qt.AlignLeft, a)
+            p.drawText(
+                QRectF(ax, y, self._aw, self._caph), Qt.AlignVCenter | Qt.AlignLeft, a
+            )
             y += self._caph + self._rgap
 
 
@@ -291,7 +367,14 @@ class _VolumeCursorHud(QWidget):
     change (even if side stays held). Click-through topmost, like _ShortcutHud."""
 
     def __init__(self, get_state):
-        super().__init__(None, Qt.FramelessWindowHint | Qt.Tool | Qt.WindowStaysOnTopHint | Qt.WindowTransparentForInput | Qt.NoDropShadowWindowHint)
+        super().__init__(
+            None,
+            Qt.FramelessWindowHint
+            | Qt.Tool
+            | Qt.WindowStaysOnTopHint
+            | Qt.WindowTransparentForInput
+            | Qt.NoDropShadowWindowHint,
+        )
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
         self._get = get_state
@@ -312,8 +395,8 @@ class _VolumeCursorHud(QWidget):
 
     def _tick(self):
         st = self._get() or {}
-        held = bool(st.get('mouse_held', False))
-        vol = float(st.get('volume', 0.0) or 0.0)
+        held = bool(st.get("mouse_held", False))
+        vol = float(st.get("volume", 0.0) or 0.0)
         now = time.monotonic()
         if abs(vol - self._last_vol) > 0.0005:
             self._vol_t = now
@@ -322,6 +405,7 @@ class _VolumeCursorHud(QWidget):
         dt = now - self._last_tick_t if self._last_tick_t else 0.016
         self._last_tick_t = now
         import math
+
         bar_k = 1.0 - math.exp(-12.0 * dt)
         self._vol_disp += (self._vol - self._vol_disp) * bar_k
         target = 1.0 if held and now - self._vol_t < 1.0 else 0.0
@@ -340,12 +424,17 @@ class _VolumeCursorHud(QWidget):
             from ctypes import wintypes
 
             class _P(ctypes.Structure):
-                _fields_ = [('x', wintypes.LONG), ('y', wintypes.LONG)]
+                _fields_ = [("x", wintypes.LONG), ("y", wintypes.LONG)]
+
             p = _P()
             ctypes.windll.user32.GetCursorPos(ctypes.byref(p))
             cx, cy = (int(p.x), int(p.y))
             from PySide6.QtGui import QGuiApplication
-            scr = QGuiApplication.screenAt(QPointF(cx, cy).toPoint()) or QGuiApplication.primaryScreen()
+
+            scr = (
+                QGuiApplication.screenAt(QPointF(cx, cy).toPoint())
+                or QGuiApplication.primaryScreen()
+            )
             geo = scr.availableGeometry()
             x = min(max(cx - self._W // 2, geo.left()), geo.right() - self._W)
             y = min(max(cy - self._H - 14, geo.top()), geo.bottom() - self._H)
@@ -360,15 +449,16 @@ class _VolumeCursorHud(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
         p.setOpacity(self._alpha)
-        p.setPen(QPen(QColor('#3a3a38'), 1))
+        p.setPen(QPen(QColor("#3a3a38"), 1))
         p.setBrush(QColor(42, 42, 40, 235))
         p.drawRoundedRect(QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5), 10, 10)
-        col = QColor('#e8e8e6')
+        col = QColor("#e8e8e6")
         ix, iy = (12, self._H // 2)
         p.setPen(Qt.NoPen)
         p.setBrush(col)
         p.drawRect(ix, iy - 3, 3, 6)
         from PySide6.QtGui import QPainterPath
+
         cone = QPainterPath()
         cone.moveTo(ix + 3, iy - 3)
         cone.lineTo(ix + 8, iy - 7)
@@ -399,7 +489,17 @@ class _VolumeCursorHud(QWidget):
 
 
 class SpotifyOverlay(QWidget):
-    def __init__(self, get_state, media, on_move=None, on_move_mode=None, on_resize=None, on_snap=None, on_skip=None, on_hover=None):
+    def __init__(
+        self,
+        get_state,
+        media,
+        on_move=None,
+        on_move_mode=None,
+        on_resize=None,
+        on_snap=None,
+        on_skip=None,
+        on_hover=None,
+    ):
         super().__init__()
         self._get_state = get_state
         self._media = media
@@ -470,7 +570,7 @@ class SpotifyOverlay(QWidget):
         self._tile_pix = {}
         self._tile_img = {}
         self._tile_loading = set()
-        self._last_position = ''
+        self._last_position = ""
         self._reposition_from_state()
         self._alpha = 0.0
         self._vol = 0.0
@@ -485,7 +585,7 @@ class SpotifyOverlay(QWidget):
         self._cover_pix = None
         self._cover_track = None
         self._shadow_cache = {}
-        self._title = self._artist = ''
+        self._title = self._artist = ""
         self._playing = self._muted = self._safe = False
         self._prev_muted = False
         self._prev_playing = False
@@ -520,7 +620,12 @@ class SpotifyOverlay(QWidget):
         on exit we restore non-activating."""
         try:
             hwnd = int(self.winId())
-            GWL_EXSTYLE, WS_EX_LAYERED, WS_EX_TRANSPARENT, WS_EX_NOACTIVATE = (-20, 524288, 32, 134217728)
+            GWL_EXSTYLE, WS_EX_LAYERED, WS_EX_TRANSPARENT, WS_EX_NOACTIVATE = (
+                -20,
+                524288,
+                32,
+                134217728,
+            )
             style = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
             style |= WS_EX_LAYERED
             if on:
@@ -539,7 +644,7 @@ class SpotifyOverlay(QWidget):
         except Exception:
             pass
 
-    def _ensure_topmost(self, strong: bool=False) -> None:
+    def _ensure_topmost(self, strong: bool = False) -> None:
         """Re-assert HWND_TOPMOST. A WindowStaysOnTopHint overlay can lose its
         z-order when a game takes the foreground / switches to borderless
         fullscreen - it then sits BEHIND the game until re-shown (the user had
@@ -569,16 +674,16 @@ class SpotifyOverlay(QWidget):
             st = self._get_state()
         except Exception:
             st = {}
-        pos = st.get('overlay_position') or 'middle_left'
-        _cxr = st.get('overlay_custom_x', -1.0)
-        _cyr = st.get('overlay_custom_y', -1.0)
+        pos = st.get("overlay_position") or "middle_left"
+        _cxr = st.get("overlay_custom_x", -1.0)
+        _cyr = st.get("overlay_custom_y", -1.0)
         cx = float(_cxr) if _cxr is not None else -1.0
         cy = float(_cyr) if _cyr is not None else -1.0
-        scale = float(st.get('overlay_scale', 1.0) or 1.0)
+        scale = float(st.get("overlay_scale", 1.0) or 1.0)
         scale = max(0.5, min(2.0, scale))
-        compact = bool(st.get('overlay_compact', False))
-        mv = bool(st.get('overlay_move_mode', False))
-        scr_name = st.get('overlay_screen') or ''
+        compact = bool(st.get("overlay_compact", False))
+        mv = bool(st.get("overlay_move_mode", False))
+        scr_name = st.get("overlay_screen") or ""
         cover_only = compact and self._text_a < 0.02
         sig = (pos, cx, cy, scale, compact, cover_only, scr_name, mv)
         if sig == self._last_position:
@@ -606,36 +711,48 @@ class SpotifyOverlay(QWidget):
             screen = QGuiApplication.primaryScreen()
         geo = screen.geometry()
         anchor_w = int((_COVER + _PAD * 2) * scale) if compact else cw
-        x, y = _overlay_xy(pos, geo.width(), geo.height(), anchor_w, ch, custom_x=cx, custom_y=cy)
+        x, y = _overlay_xy(
+            pos, geo.width(), geo.height(), anchor_w, ch, custom_x=cx, custom_y=cy
+        )
         self.move(geo.x() + x, geo.y() + y - int(up * scale))
 
     def _tick(self):
         now = time.monotonic()
         st = self._get_state()
-        move = bool(st.get('overlay_move_mode', False))
+        move = bool(st.get("overlay_move_mode", False))
         if move != self._move_mode:
             self._move_mode = move
             self._set_click_through(not move)
             self.setCursor(Qt.SizeAllCursor if move else Qt.ArrowCursor)
             if move:
                 try:
-                    self._hint = _MoveHint(self.screen() or QGuiApplication.primaryScreen())
+                    self._hint = _MoveHint(
+                        self.screen() or QGuiApplication.primaryScreen()
+                    )
                 except Exception:
                     self._hint = None
-            elif getattr(self, '_hint', None) is not None:
+            elif getattr(self, "_hint", None) is not None:
                 self._hint.close()
                 self._hint = None
             self.update()
         self._update_hover(now)
         if self._hovering:
             self._show_until = now + 1.0
-        acting = now < self._skip_until or now < getattr(self, '_vol_show_until', 0.0)
-        hud_want = self._held and not self._move_mode and not self._compact and not acting and now - self._held_since > 0.5
+        acting = now < self._skip_until or now < getattr(self, "_vol_show_until", 0.0)
+        hud_want = (
+            self._held
+            and not self._move_mode
+            and not self._compact
+            and not acting
+            and now - self._held_since > 0.5
+        )
         self._hud_a += ((1.0 if hud_want else 0.0) - self._hud_a) * 0.22
         if self._hud_a > 0.01:
             if self._hud is None:
                 try:
-                    self._hud = _ShortcutHud(self.screen() or QGuiApplication.primaryScreen())
+                    self._hud = _ShortcutHud(
+                        self.screen() or QGuiApplication.primaryScreen()
+                    )
                 except Exception:
                     self._hud = None
             if self._hud is not None:
@@ -647,7 +764,13 @@ class SpotifyOverlay(QWidget):
             except Exception:
                 pass
             self._hud = None
-        hint_on = self._hovering and self._strip_a < 0.08 and not self._move_mode and bool(self._title) and self._nq is None
+        hint_on = (
+            self._hovering
+            and self._strip_a < 0.08
+            and not self._move_mode
+            and bool(self._title)
+            and self._nq is None
+        )
         self._hint_a += ((1.0 if hint_on else 0.0) - self._hint_a) * 0.2
         if self._hint_a < 0.01:
             self._hint_a = 0.0
@@ -677,33 +800,39 @@ class SpotifyOverlay(QWidget):
             self._text_a = 1.0
         self._poll_double_click(now)
         if self._pending_scale is not None:
-            if abs(float(st.get('overlay_scale', 1.0) or 1.0) - self._pending_scale) < 1e-06 or now >= self._pending_scale_until:
+            if (
+                abs(float(st.get("overlay_scale", 1.0) or 1.0) - self._pending_scale)
+                < 1e-06
+                or now >= self._pending_scale_until
+            ):
                 self._pending_scale = None
-        if (not self._move_mode or not (self._dragging or self._resizing)) and self._pending_scale is None:
+        if (
+            not self._move_mode or not (self._dragging or self._resizing)
+        ) and self._pending_scale is None:
             self._reposition_from_state()
         if move:
             self._show_until = now + 1.0
-        ping = float(st.get('overlay_ping') or 0.0)
+        ping = float(st.get("overlay_ping") or 0.0)
         if ping > self._last_ping:
             self._last_ping = ping
             self._show_until = now + _LINGER_S
-        enabled = bool(st.get('overlay_enabled', True))
+        enabled = bool(st.get("overlay_enabled", True))
         self.setVisible(enabled)
         if enabled and now - self._last_topmost >= 1.0:
             self._last_topmost = now
             self._ensure_topmost()
-        gf = enabled and bool(st.get('game_focused', False))
+        gf = enabled and bool(st.get("game_focused", False))
         if gf and not self._prev_game_focused:
             self._ensure_topmost(strong=True)
         self._prev_game_focused = gf
-        self._volume = max(0.0, min(1.0, float(st.get('volume', 0.0))))
-        self._muted = bool(st.get('muted', False))
-        self._safe = bool(st.get('safe', False))
+        self._volume = max(0.0, min(1.0, float(st.get("volume", 0.0))))
+        self._muted = bool(st.get("muted", False))
+        self._safe = bool(st.get("safe", False))
         np = self._media.get()
-        self._title = np.title if np else ''
-        self._artist = np.artist if np else ''
+        self._title = np.title if np else ""
+        self._artist = np.artist if np else ""
         self._playing = np.is_playing if np else False
-        self._connect_skip_t = float(st.get('_connect_skip_t', 0.0) or 0.0)
+        self._connect_skip_t = float(st.get("_connect_skip_t", 0.0) or 0.0)
         if not self._playing and now - self._connect_skip_t < 1.0:
             self._playing = True
         if self._prev_muted and not self._muted:
@@ -714,7 +843,14 @@ class SpotifyOverlay(QWidget):
         self._prev_playing = self._playing
         play_target = 1.0 if self._playing and now < self._play_show_until else 0.0
         self._play_a += (play_target - self._play_a) * 0.16
-        sig = (self._title, self._artist, round(self._volume, 2), self._muted, self._safe, self._playing)
+        sig = (
+            self._title,
+            self._artist,
+            round(self._volume, 2),
+            self._muted,
+            self._safe,
+            self._playing,
+        )
         if sig != self._last_sig:
             self._show_until = now + _LINGER_S
             self._last_sig = sig
@@ -723,9 +859,13 @@ class SpotifyOverlay(QWidget):
         self._prev_vol = self._volume
         self._vol_visible = now < self._vol_show_until
         self._slider_a += ((1.0 if self._vol_visible else 0.0) - self._slider_a) * 0.16
-        always = bool(st.get('overlay_always_on', False))
-        _hide_menu = st.get('overlay_in_game_only', False) and not st.get('game_focused', False)
-        _hide_drive = st.get('overlay_drive_only', False) and not st.get('can_skip', True)
+        always = bool(st.get("overlay_always_on", False))
+        _hide_menu = st.get("overlay_in_game_only", False) and not st.get(
+            "game_focused", False
+        )
+        _hide_drive = st.get("overlay_drive_only", False) and not st.get(
+            "can_skip", True
+        )
         if (_hide_menu or _hide_drive) and not self._move_mode:
             target = 0.0
         else:
@@ -737,36 +877,63 @@ class SpotifyOverlay(QWidget):
         self._vol += (self._volume - self._vol) * 0.5
         _thumb = np.thumb if np else None
         cover_changed = False
-        if _thumb != getattr(self, '_cover_src', False):
+        if _thumb != getattr(self, "_cover_src", False):
             self._cover_src = _thumb
             cover_changed = True
             if _thumb:
                 img = QImage.fromData(_thumb)
-                self._cover_pix = QPixmap.fromImage(img).scaled(_COVER, _COVER, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation) if not img.isNull() else None
+                self._cover_pix = (
+                    QPixmap.fromImage(img).scaled(
+                        _COVER,
+                        _COVER,
+                        Qt.KeepAspectRatioByExpanding,
+                        Qt.SmoothTransformation,
+                    )
+                    if not img.isNull()
+                    else None
+                )
             else:
                 self._cover_pix = None
-        self._held = bool(st.get('mouse_held', False))
-        rel_seq = int(st.get('_ovl_hold_release', 0) or 0)
+        self._held = bool(st.get("mouse_held", False))
+        rel_seq = int(st.get("_ovl_hold_release", 0) or 0)
         if rel_seq != self._hold_release_seq:
             self._hold_release_seq = rel_seq
             self._hold_uri = None
             self._opt = 0
-        nq = st.get('np_queue')
+        nq = st.get("np_queue")
         nq = nq if isinstance(nq, dict) else None
-        ap = bool(nq and nq.get('autoplay'))
+        ap = bool(nq and nq.get("autoplay"))
         if nq:
-            rc = (nq.get('current') or {}).get('uri')
+            rc = (nq.get("current") or {}).get("uri")
             if ap:
                 if self._opt != 0 and self._ap_frozen is None:
                     self._ap_frozen = nq
                     self._ap_skip_from = None
-                    _clog("AP-FREEZE opt={} cur='{}' n0='{}'".format(self._opt, ((nq.get('current') or {}).get('title') or '')[:14], ((nq.get('next') or [{}])[0].get('title') or '')[:14]))
-                elif self._ap_frozen is not None and self._ap_skip_from is not None and now - self._last_skip_t > 0.6:
-                    if rc != self._ap_skip_from and now - self._clu_change_t > 1.0 or now - self._ap_skip_t > 6.0:
+                    _clog(
+                        "AP-FREEZE opt={} cur='{}' n0='{}'".format(
+                            self._opt,
+                            ((nq.get("current") or {}).get("title") or "")[:14],
+                            ((nq.get("next") or [{}])[0].get("title") or "")[:14],
+                        )
+                    )
+                elif (
+                    self._ap_frozen is not None
+                    and self._ap_skip_from is not None
+                    and now - self._last_skip_t > 0.6
+                ):
+                    if (
+                        rc != self._ap_skip_from
+                        and now - self._clu_change_t > 1.0
+                        or now - self._ap_skip_t > 6.0
+                    ):
                         self._ap_frozen = None
                         self._hold_uri = None
                         self._opt = 0
-                        _clog("AP-RESYNC -> live cur='{}'".format(((nq.get('current') or {}).get('title') or '')[:14]))
+                        _clog(
+                            "AP-RESYNC -> live cur='{}'".format(
+                                ((nq.get("current") or {}).get("title") or "")[:14]
+                            )
+                        )
             else:
                 self._ap_frozen = None
             if self._nq is None:
@@ -775,26 +942,49 @@ class SpotifyOverlay(QWidget):
                 if rc != self._nq_cur:
                     self._clu_change_t = now
             elif self._hold_uri is not None:
-                flat = (nq.get('prev') or []) + ([nq['current']] if nq.get('current') else []) + (nq.get('next') or [])
-                base = len(nq.get('prev') or [])
+                flat = (
+                    (nq.get("prev") or [])
+                    + ([nq["current"]] if nq.get("current") else [])
+                    + (nq.get("next") or [])
+                )
+                base = len(nq.get("prev") or [])
                 if rc == self._hold_uri:
                     self._opt = 0
                     self._hold_uri = None
                 else:
-                    idx = next((i for i, t in enumerate(flat) if t.get('uri') == self._hold_uri), None)
+                    idx = next(
+                        (
+                            i
+                            for i, t in enumerate(flat)
+                            if t.get("uri") == self._hold_uri
+                        ),
+                        None,
+                    )
                     if idx is not None:
                         self._opt = idx - base
                     elif now - self._hold_t > 3.0:
                         self._hold_uri = None
                 if rc != self._nq_cur:
                     self._clu_change_t = now
-                    _clog("HOLD opt={} landed={} clu='{}'".format(self._opt, int(self._hold_uri is None), ((nq.get('current') or {}).get('title') or '')[:18]))
+                    _clog(
+                        "HOLD opt={} landed={} clu='{}'".format(
+                            self._opt,
+                            int(self._hold_uri is None),
+                            ((nq.get("current") or {}).get("title") or "")[:18],
+                        )
+                    )
             elif rc != self._nq_cur:
                 self._clu_change_t = now
                 if now - self._last_skip_t < 2.0:
-                    old = (self._nq.get('prev') or []) + ([self._nq['current']] if self._nq.get('current') else []) + (self._nq.get('next') or [])
-                    ob = len(self._nq.get('prev') or [])
-                    ni = next((i for i, t in enumerate(old) if t.get('uri') == rc), None)
+                    old = (
+                        (self._nq.get("prev") or [])
+                        + ([self._nq["current"]] if self._nq.get("current") else [])
+                        + (self._nq.get("next") or [])
+                    )
+                    ob = len(self._nq.get("prev") or [])
+                    ni = next(
+                        (i for i, t in enumerate(old) if t.get("uri") == rc), None
+                    )
                     if ni is not None:
                         prev_opt = self._opt
                         self._opt -= ni - ob
@@ -804,59 +994,114 @@ class SpotifyOverlay(QWidget):
                             self._opt = min(0, self._opt)
                 else:
                     self._opt = 0
-                _clog("CLU brow={} -> opt={} clu='{}'".format(int(now < self._skip_until), self._opt, ((nq.get('current') or {}).get('title') or '')[:18]))
+                _clog(
+                    "CLU brow={} -> opt={} clu='{}'".format(
+                        int(now < self._skip_until),
+                        self._opt,
+                        ((nq.get("current") or {}).get("title") or "")[:18],
+                    )
+                )
             self._nq, self._nq_cur = (nq, rc)
         elif not self._held and self._strip_a < 0.02:
             self._nq = self._nq_cur = None
             self._opt = 0
-        if self._goto_t and now >= self._goto_t and self._opt != 0 and self._nq is not None and self._on_skip:
+        if (
+            self._goto_t
+            and now >= self._goto_t
+            and self._opt != 0
+            and self._nq is not None
+            and self._on_skip
+        ):
             self._goto_t = 0.0
-            bq = self._ap_frozen if self._nq.get('autoplay') and self._ap_frozen is not None else self._nq
-            flat = (bq.get('prev') or []) + ([bq['current']] if bq.get('current') else []) + (bq.get('next') or [])
-            pos = len(bq.get('prev') or []) + self._opt
+            bq = (
+                self._ap_frozen
+                if self._nq.get("autoplay") and self._ap_frozen is not None
+                else self._nq
+            )
+            flat = (
+                (bq.get("prev") or [])
+                + ([bq["current"]] if bq.get("current") else [])
+                + (bq.get("next") or [])
+            )
+            pos = len(bq.get("prev") or []) + self._opt
             if 0 <= pos < len(flat):
-                target = (flat[pos] or {}).get('uri')
+                target = (flat[pos] or {}).get("uri")
                 if target:
                     self._hold_uri = target
                     self._hold_track = flat[pos]
                     self._hold_t = now
-                    if self._nq.get('autoplay'):
-                        _clog("AP-SETTLE opt={} pos={} frozen={} tgt='{}'".format(self._opt, pos, self._ap_frozen is not None, (flat[pos].get('title') or '')[:16]))
+                    if self._nq.get("autoplay"):
+                        _clog(
+                            "AP-SETTLE opt={} pos={} frozen={} tgt='{}'".format(
+                                self._opt,
+                                pos,
+                                self._ap_frozen is not None,
+                                (flat[pos].get("title") or "")[:16],
+                            )
+                        )
                     try:
                         self._on_skip(self._opt)
                     except Exception:
                         pass
-                    if self._nq.get('autoplay'):
+                    if self._nq.get("autoplay"):
                         self._ap_skip_t = now
                         self._ap_skip_from = self._nq_cur
-                    if self._nq.get('autoplay') and self._ap_frozen is not None:
-                        self._ap_frozen = {'autoplay': True, 'current': flat[pos], 'prev': flat[:pos], 'next': flat[pos + 1:]}
+                    if self._nq.get("autoplay") and self._ap_frozen is not None:
+                        self._ap_frozen = {
+                            "autoplay": True,
+                            "current": flat[pos],
+                            "prev": flat[:pos],
+                            "next": flat[pos + 1 :],
+                        }
                         self._opt = 0
         self._queue = self._derive()
-        self._disp_cur = (self._queue.get('current') or {}).get('uri') if self._queue else None
-        if not self._held and self._opt != 0 and self._nq is not None and self._hold_uri is None and now - self._clu_change_t > 0.4 and now - self._last_skip_t > 2.0:
+        self._disp_cur = (
+            (self._queue.get("current") or {}).get("uri") if self._queue else None
+        )
+        if (
+            not self._held
+            and self._opt != 0
+            and self._nq is not None
+            and self._hold_uri is None
+            and now - self._clu_change_t > 0.4
+            and now - self._last_skip_t > 2.0
+        ):
             self._slide = max(-2.0, min(2.0, float(-self._opt))) * _TILE_PITCH
             self._opt = 0
             self._queue = self._derive()
-            self._disp_cur = (self._queue.get('current') or {}).get('uri') if self._queue else None
-            _clog("SETTLE-FIX -> reality clu='{}'".format((((self._queue or {}).get('current') or {}).get('title') or '')[:18]))
-        nq = self._ap_frozen if self._ap_frozen is not None and self._nq and self._nq.get('autoplay') else self._nq
+            self._disp_cur = (
+                (self._queue.get("current") or {}).get("uri") if self._queue else None
+            )
+            _clog(
+                "SETTLE-FIX -> reality clu='{}'".format(
+                    (((self._queue or {}).get("current") or {}).get("title") or "")[:18]
+                )
+            )
+        nq = (
+            self._ap_frozen
+            if self._ap_frozen is not None and self._nq and self._nq.get("autoplay")
+            else self._nq
+        )
         if nq:
-            tr = (nq.get('prev') or []) + ([nq['current']] if nq.get('current') else []) + (nq.get('next') or [])
+            tr = (
+                (nq.get("prev") or [])
+                + ([nq["current"]] if nq.get("current") else [])
+                + (nq.get("next") or [])
+            )
             if tr:
-                base = len(nq.get('prev') or [])
+                base = len(nq.get("prev") or [])
                 pos = max(0, min(len(tr) - 1, base + self._opt))
-                self._cover(tr[pos].get('art'), _COVER)
+                self._cover(tr[pos].get("art"), _COVER)
                 if self._hold_uri is not None and self._hold_track is not None:
-                    self._cover(self._hold_track.get('art'), _COVER)
+                    self._cover(self._hold_track.get("art"), _COVER)
                 if pos + 1 < len(tr):
-                    self._cover(tr[pos + 1].get('art'), _COVER)
+                    self._cover(tr[pos + 1].get("art"), _COVER)
                 if pos - 1 >= 0:
-                    self._cover(tr[pos - 1].get('art'), _COVER)
+                    self._cover(tr[pos - 1].get("art"), _COVER)
                 lo = max(0, pos - _N_PREV - 5)
                 hi = min(len(tr), pos + _N_NEXT + 1 + 5)
                 for t in tr[lo:hi]:
-                    self._cover(t.get('art'), _TILE)
+                    self._cover(t.get("art"), _TILE)
         tk = (self._title, self._artist)
         if self._held and not self._held_prev:
             self._held_since = now
@@ -867,14 +1112,22 @@ class SpotifyOverlay(QWidget):
             self._strip_track = tk
         else:
             self._strip_track = tk
-        strip_on = 1.0 if (self._held or self._hovering and now < self._skip_until) and self._queue and not self._cover_only else 0.0
+        strip_on = (
+            1.0
+            if (self._held or self._hovering and now < self._skip_until)
+            and self._queue
+            and not self._cover_only
+            else 0.0
+        )
         if strip_on or self._strip_a > 0.01:
             self._show_until = now + 1.0
-        self._strip_a += (strip_on - self._strip_a) * (0.12 if strip_on > self._strip_a else 0.1)
+        self._strip_a += (strip_on - self._strip_a) * (
+            0.12 if strip_on > self._strip_a else 0.1
+        )
         self._strip_a = max(0.0, min(1.0, self._strip_a))
-        seq = int(st.get('mskip_seq', 0) or 0)
-        bseq = int(st.get('mbrowse_seq', 0) or 0)
-        net = int(st.get('mskip_net', 0) or 0)
+        seq = int(st.get("mskip_seq", 0) or 0)
+        bseq = int(st.get("mbrowse_seq", 0) or 0)
+        net = int(st.get("mskip_net", 0) or 0)
         if self._mskip_seq is None:
             self._mskip_seq, self._mbrowse_seq, self._mskip_net = (seq, bseq, net)
         elif seq != self._mskip_seq:
@@ -882,14 +1135,20 @@ class SpotifyOverlay(QWidget):
             wake = bseq != self._mbrowse_seq
             visible = now < self._skip_until or self._strip_a > 0.05
             if not wake:
-                self._click_streak = self._click_streak + 1 if now - self._click_t < 1.2 else 1
+                self._click_streak = (
+                    self._click_streak + 1 if now - self._click_t < 1.2 else 1
+                )
                 self._click_t = now
                 if self._click_streak >= 2:
                     wake = True
             else:
                 self._click_streak = 0
             self._mskip_seq, self._mbrowse_seq, self._mskip_net = (seq, bseq, net)
-            _clog('MSKIP seq={} n={} wake={} vis={} nq={} held={}'.format(seq, n, int(wake), int(visible), self._nq is None, self._held))
+            _clog(
+                "MSKIP seq={} n={} wake={} vis={} nq={} held={}".format(
+                    seq, n, int(wake), int(visible), self._nq is None, self._held
+                )
+            )
             if n != 0 and self._nq and (-64 < n < 64):
                 self._opt += n
                 self._last_skip_t = now
@@ -899,16 +1158,56 @@ class SpotifyOverlay(QWidget):
                     self._slide = (1 if n > 0 else -1) * _TILE_PITCH
                     self._skip_until = now + _SKIP_WIN
                 self._queue = self._derive()
-                self._disp_cur = (self._queue.get('current') or {}).get('uri') if self._queue else None
-                _clog("SKIP n={} wake={} vis={} -> opt={} disp='{}' np='{}'".format(n, int(wake), int(visible), self._opt, (((self._queue or {}).get('current') or {}).get('title') or '')[:18], (self._title or '')[:18]))
+                self._disp_cur = (
+                    (self._queue.get("current") or {}).get("uri")
+                    if self._queue
+                    else None
+                )
+                _clog(
+                    "SKIP n={} wake={} vis={} -> opt={} disp='{}' np='{}'".format(
+                        n,
+                        int(wake),
+                        int(visible),
+                        self._opt,
+                        (((self._queue or {}).get("current") or {}).get("title") or "")[
+                            :18
+                        ],
+                        (self._title or "")[:18],
+                    )
+                )
         self._slide += (0.0 - self._slide) * 0.18
         if abs(self._slide) < 0.5:
             self._slide = 0.0
-        self._timer.setInterval(16 if self._strip_a > 0.01 or abs(self._slide) > 0.5 or 0.01 < self._hud_a < 0.99 or 0.01 < self._hint_a < 0.99 or 0.01 < self._text_a < 0.99 else 33)
+        self._timer.setInterval(
+            16
+            if self._strip_a > 0.01
+            or abs(self._slide) > 0.5
+            or 0.01 < self._hud_a < 0.99
+            or 0.01 < self._hint_a < 0.99
+            or 0.01 < self._text_a < 0.99
+            else 33
+        )
         qsig = None
         if self._queue:
-            qsig = ((self._queue.get('current') or {}).get('uri'), tuple((t.get('uri') for t in self._queue.get('next') or [])), tuple((t.get('uri') for t in self._queue.get('prev') or [])))
-        dirty = cover_changed or sig != getattr(self, '_paint_sig', None) or abs(self._alpha - getattr(self, '_paint_alpha', -1)) > 0.005 or abs(self._play_a - getattr(self, '_paint_play_a', -1)) > 0.005 or abs(self._slider_a - getattr(self, '_paint_slider_a', -1)) > 0.005 or abs(self._vol - getattr(self, '_paint_vol', -1)) > 0.003 or abs(self._strip_a - getattr(self, '_paint_strip_a', -1)) > 0.005 or abs(self._hint_a - getattr(self, '_paint_hint_a', -1)) > 0.01 or abs(self._text_a - getattr(self, '_paint_text_a', -1)) > 0.01 or abs(self._slide) > 0.5 or len(self._tile_img) != getattr(self, '_paint_imgs', -1) or qsig != getattr(self, '_paint_qsig', None)
+            qsig = (
+                (self._queue.get("current") or {}).get("uri"),
+                tuple((t.get("uri") for t in self._queue.get("next") or [])),
+                tuple((t.get("uri") for t in self._queue.get("prev") or [])),
+            )
+        dirty = (
+            cover_changed
+            or sig != getattr(self, "_paint_sig", None)
+            or abs(self._alpha - getattr(self, "_paint_alpha", -1)) > 0.005
+            or abs(self._play_a - getattr(self, "_paint_play_a", -1)) > 0.005
+            or abs(self._slider_a - getattr(self, "_paint_slider_a", -1)) > 0.005
+            or abs(self._vol - getattr(self, "_paint_vol", -1)) > 0.003
+            or abs(self._strip_a - getattr(self, "_paint_strip_a", -1)) > 0.005
+            or abs(self._hint_a - getattr(self, "_paint_hint_a", -1)) > 0.01
+            or abs(self._text_a - getattr(self, "_paint_text_a", -1)) > 0.01
+            or abs(self._slide) > 0.5
+            or len(self._tile_img) != getattr(self, "_paint_imgs", -1)
+            or qsig != getattr(self, "_paint_qsig", None)
+        )
         if dirty:
             self._paint_sig = sig
             self._paint_alpha = self._alpha
@@ -943,9 +1242,13 @@ class SpotifyOverlay(QWidget):
         pp.drawText(m, m + asc, text)
         pp.end()
         raw = img.bits().tobytes()
-        pil = Image.frombuffer('RGBA', (img.width(), img.height()), raw, 'raw', 'BGRA', 0, 1)
+        pil = Image.frombuffer(
+            "RGBA", (img.width(), img.height()), raw, "raw", "BGRA", 0, 1
+        )
         pil = pil.filter(ImageFilter.GaussianBlur(3))
-        out = QImage(pil.tobytes('raw', 'BGRA'), pil.width, pil.height, QImage.Format_ARGB32).copy()
+        out = QImage(
+            pil.tobytes("raw", "BGRA"), pil.width, pil.height, QImage.Format_ARGB32
+        ).copy()
         pix = QPixmap.fromImage(out)
         if len(self._shadow_cache) > 40:
             self._shadow_cache.clear()
@@ -980,7 +1283,9 @@ class SpotifyOverlay(QWidget):
         p.setPen(Qt.NoPen)
         for i in range(layers, 0, -1):
             p.setBrush(QColor(0, 0, 0, 5))
-            p.drawRoundedRect(QRectF(x - i + 1, y - i + 3, w + 2 * i, h + 2 * i), r + i, r + i)
+            p.drawRoundedRect(
+                QRectF(x - i + 1, y - i + 3, w + 2 * i, h + 2 * i), r + i, r + i
+            )
 
     def _mute_glyph(self, p, cx, cy):
         p.setPen(Qt.NoPen)
@@ -1053,13 +1358,13 @@ class SpotifyOverlay(QWidget):
         left, top = (pos.x() <= g, pos.y() <= g)
         right, bottom = (pos.x() >= w - g, pos.y() >= h - g)
         if top and left:
-            return 'tl'
+            return "tl"
         if top and right:
-            return 'tr'
+            return "tr"
         if bottom and left:
-            return 'bl'
+            return "bl"
         if bottom and right:
-            return 'br'
+            return "br"
         return None
 
     def _region_at(self, pos):
@@ -1074,9 +1379,9 @@ class SpotifyOverlay(QWidget):
         tx = _PAD + _COVER + 16
         if tx <= x <= _W - _PAD:
             if 38 <= y <= 62:
-                return 'title'
+                return "title"
             if 64 <= y <= 90 and self._artist:
-                return 'artist'
+                return "artist"
         return None
 
     def _fire_link(self):
@@ -1089,21 +1394,29 @@ class SpotifyOverlay(QWidget):
         Resolve name -> id via the getsegue.app worker, fall back to a search.
         Network + shell open run off the GUI thread."""
         track, artist = (self._title, self._artist)
-        if kind == 'artist' and not artist or not (track or artist):
+        if kind == "artist" and not artist or not (track or artist):
             return None
 
         def _run():
             try:
                 from fh6_spotify import spotify_links as _sl
+
                 r = _sl.resolve(track, artist)
-                uri = (r.get(kind) or {}).get('uri') if r else ''
-                _clog('LINK kind={} track={!r} artist={!r} resolved={} uri={!r}'.format(kind, track, artist, bool(r), uri))
+                uri = (r.get(kind) or {}).get("uri") if r else ""
+                _clog(
+                    "LINK kind={} track={!r} artist={!r} resolved={} uri={!r}".format(
+                        kind, track, artist, bool(r), uri
+                    )
+                )
                 if not uri:
-                    uri = _sl.search_uri(artist if kind == 'artist' else '{} {}'.format(track, artist))
+                    uri = _sl.search_uri(
+                        artist if kind == "artist" else "{} {}".format(track, artist)
+                    )
                 if uri:
                     os.startfile(uri)
             except Exception as e:
-                _clog('LINK EXC {}'.format(e))
+                _clog("LINK EXC {}".format(e))
+
         threading.Thread(target=_run, daemon=True).start()
 
     def _apply_live_scale(self, scale, anchor, corner):
@@ -1113,8 +1426,8 @@ class SpotifyOverlay(QWidget):
         base_w = _COVER + _PAD * 2 if self._compact else _W
         base_h = _COVER + _PAD * 2 if self._compact else _H
         nw, nh = (int(base_w * scale), int(base_h * scale))
-        x = anchor.x() - nw if corner in ('tl', 'bl') else anchor.x()
-        y = anchor.y() - nh if corner in ('tl', 'tr') else anchor.y()
+        x = anchor.x() - nw if corner in ("tl", "bl") else anchor.x()
+        y = anchor.y() - nh if corner in ("tl", "tr") else anchor.y()
         self.setGeometry(x, y, nw, nh)
         self.update()
 
@@ -1130,38 +1443,65 @@ class SpotifyOverlay(QWidget):
             corner = self._corner_at(e.position().toPoint())
             if corner:
                 fg = self.frameGeometry()
-                self._rs_anchor = {'tl': fg.bottomRight(), 'tr': fg.bottomLeft(), 'bl': fg.topRight(), 'br': fg.topLeft()}[corner]
+                self._rs_anchor = {
+                    "tl": fg.bottomRight(),
+                    "tr": fg.bottomLeft(),
+                    "bl": fg.topRight(),
+                    "br": fg.topLeft(),
+                }[corner]
                 self._rs_corner = corner
                 gp = e.globalPosition().toPoint()
-                self._rs_start_dist = max(1.0, ((gp.x() - self._rs_anchor.x()) ** 2 + (gp.y() - self._rs_anchor.y()) ** 2) ** 0.5)
+                self._rs_start_dist = max(
+                    1.0,
+                    (
+                        (gp.x() - self._rs_anchor.x()) ** 2
+                        + (gp.y() - self._rs_anchor.y()) ** 2
+                    )
+                    ** 0.5,
+                )
                 self._rs_start_scale = self._scale
                 self._resizing = True
             else:
                 self._dragging = True
-                self._drag_off = e.globalPosition().toPoint() - self.frameGeometry().topLeft()
+                self._drag_off = (
+                    e.globalPosition().toPoint() - self.frameGeometry().topLeft()
+                )
             e.accept()
             return None
         if e.button() == Qt.LeftButton and not dbl:
             reg = self._region_at(e.position().toPoint())
             if reg:
-                self._pending_link = 'artist' if reg == 'artist' else 'album'
+                self._pending_link = "artist" if reg == "artist" else "album"
                 QTimer.singleShot(520, self._fire_link)
                 e.accept()
 
     def mouseMoveEvent(self, e):
         if self._move_mode and self._resizing:
             gp = e.globalPosition().toPoint()
-            dist = max(1.0, ((gp.x() - self._rs_anchor.x()) ** 2 + (gp.y() - self._rs_anchor.y()) ** 2) ** 0.5)
-            scale = max(0.6, min(2.0, self._rs_start_scale * dist / self._rs_start_dist))
+            dist = max(
+                1.0,
+                (
+                    (gp.x() - self._rs_anchor.x()) ** 2
+                    + (gp.y() - self._rs_anchor.y()) ** 2
+                )
+                ** 0.5,
+            )
+            scale = max(
+                0.6, min(2.0, self._rs_start_scale * dist / self._rs_start_dist)
+            )
             self._apply_live_scale(scale, self._rs_anchor, self._rs_corner)
             e.accept()
             return None
         if self._move_mode and self._dragging and self._drag_off is not None:
             gp = e.globalPosition().toPoint()
             target = gp - self._drag_off
-            if getattr(self, '_hint', None) is not None:
+            if getattr(self, "_hint", None) is not None:
                 self._hint.place(QGuiApplication.screenAt(gp))
-                self._hint.fade_for(self.frameGeometry().translated(target - self.frameGeometry().topLeft()))
+                self._hint.fade_for(
+                    self.frameGeometry().translated(
+                        target - self.frameGeometry().topLeft()
+                    )
+                )
             if e.modifiers() & Qt.ShiftModifier:
                 scr = QGuiApplication.screenAt(gp) or QGuiApplication.primaryScreen()
                 if self._guides is None or self._guides.geometry() != scr.geometry():
@@ -1174,8 +1514,16 @@ class SpotifyOverlay(QWidget):
                 tx = target.x() - geo.x()
                 ty = target.y() - geo.y()
                 m = _SNAP_MARGIN
-                xc = [(m, 'left', m), ((geo.width() - w) // 2, 'center', geo.width() / 2), (geo.width() - w - m, 'right', geo.width() - m)]
-                yc = [(m, 'top', m), ((geo.height() - h) // 2, 'middle', geo.height() / 2), (geo.height() - h - m, 'bottom', geo.height() - m)]
+                xc = [
+                    (m, "left", m),
+                    ((geo.width() - w) // 2, "center", geo.width() / 2),
+                    (geo.width() - w - m, "right", geo.width() - m),
+                ]
+                yc = [
+                    (m, "top", m),
+                    ((geo.height() - h) // 2, "middle", geo.height() / 2),
+                    (geo.height() - h - m, "bottom", geo.height() - m),
+                ]
                 xname = yname = None
                 vline = hline = None
                 for sx, name, gl in xc:
@@ -1199,7 +1547,13 @@ class SpotifyOverlay(QWidget):
             return None
         if self._move_mode:
             corner = self._corner_at(e.position().toPoint())
-            cur = {None: Qt.SizeAllCursor, 'tl': Qt.SizeFDiagCursor, 'br': Qt.SizeFDiagCursor, 'tr': Qt.SizeBDiagCursor, 'bl': Qt.SizeBDiagCursor}[corner]
+            cur = {
+                None: Qt.SizeAllCursor,
+                "tl": Qt.SizeFDiagCursor,
+                "br": Qt.SizeFDiagCursor,
+                "tr": Qt.SizeBDiagCursor,
+                "bl": Qt.SizeBDiagCursor,
+            }[corner]
             self.setCursor(cur)
             return None
         reg = self._region_at(e.position().toPoint())
@@ -1222,11 +1576,14 @@ class SpotifyOverlay(QWidget):
                 self._guides = None
             self._snap_axes = (None, None)
             if xname and yname and self._on_snap:
-                scr = QGuiApplication.screenAt(self.frameGeometry().center()) or QGuiApplication.primaryScreen()
+                scr = (
+                    QGuiApplication.screenAt(self.frameGeometry().center())
+                    or QGuiApplication.primaryScreen()
+                )
                 primary = QGuiApplication.primaryScreen()
-                sname = '' if primary is not None and scr is primary else scr.name()
+                sname = "" if primary is not None and scr is primary else scr.name()
                 try:
-                    self._on_snap(f'{yname}_{xname}', sname)
+                    self._on_snap(f"{yname}_{xname}", sname)
                 except Exception:
                     pass
             else:
@@ -1240,7 +1597,7 @@ class SpotifyOverlay(QWidget):
             if abs(scale - self._scale) < 1e-09:
                 return None
             center = self.frameGeometry().topLeft()
-            self._apply_live_scale(scale, center, 'br')
+            self._apply_live_scale(scale, center, "br")
             self._persist_scale()
             self._persist_position()
             e.accept()
@@ -1251,7 +1608,7 @@ class SpotifyOverlay(QWidget):
         if not dy:
             return None
         d = -1 if dy > 0 else 1
-        if d < 0 and not (self._nq.get('prev') or []):
+        if d < 0 and not (self._nq.get("prev") or []):
             return None
         now = time.monotonic()
         self._opt += d
@@ -1259,7 +1616,9 @@ class SpotifyOverlay(QWidget):
         self._skip_until = now + _SKIP_WIN
         self._last_skip_t = now
         self._queue = self._derive()
-        self._disp_cur = (self._queue.get('current') or {}).get('uri') if self._queue else None
+        self._disp_cur = (
+            (self._queue.get("current") or {}).get("uri") if self._queue else None
+        )
         self._hold_uri = None
         self._goto_t = now + _GOTO_SETTLE
         self.update()
@@ -1292,14 +1651,17 @@ class SpotifyOverlay(QWidget):
         callback (config.overlay_custom_x/y + overlay_screen). Dragging onto a
         second monitor just works - the overlay lives there from then on."""
         try:
-            scr = QGuiApplication.screenAt(self.frameGeometry().center()) or QGuiApplication.primaryScreen()
+            scr = (
+                QGuiApplication.screenAt(self.frameGeometry().center())
+                or QGuiApplication.primaryScreen()
+            )
             geo = scr.geometry()
             sx = max(1, geo.width() - self.width())
             sy = max(1, geo.height() - self.height())
             cx = max(0.0, min(1.0, (self.x() - geo.x()) / sx))
             cy = max(0.0, min(1.0, (self.y() - geo.y()) / sy))
             primary = QGuiApplication.primaryScreen()
-            sname = '' if primary is not None and scr is primary else scr.name()
+            sname = "" if primary is not None and scr is primary else scr.name()
             if self._on_move:
                 self._on_move(cx, cy, sname)
         except Exception:
@@ -1321,8 +1683,14 @@ class SpotifyOverlay(QWidget):
                 over = self._alpha >= 0.5 and fg.contains(pt.x, pt.y)
             else:
                 up_px = int(self._paint_off * self._scale)
-                dn_px = 0 if self._cover_only else int(_N_NEXT * _TILE_PITCH * self._scale)
-                over = self._alpha >= 0.5 and fg.left() <= pt.x <= fg.right() and fg.top() + up_px <= pt.y <= fg.bottom() - dn_px
+                dn_px = (
+                    0 if self._cover_only else int(_N_NEXT * _TILE_PITCH * self._scale)
+                )
+                over = (
+                    self._alpha >= 0.5
+                    and fg.left() <= pt.x <= fg.right()
+                    and fg.top() + up_px <= pt.y <= fg.bottom() - dn_px
+                )
             if over != self._hovering:
                 self._hovering = over
                 self._set_click_through(not over)
@@ -1389,7 +1757,9 @@ class SpotifyOverlay(QWidget):
             return p
         img = self._tile_img.get(url)
         if img is not None and not img.isNull():
-            p = QPixmap.fromImage(img).scaled(size, size, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
+            p = QPixmap.fromImage(img).scaled(
+                size, size, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation
+            )
             self._tile_pix[key] = p
             if len(self._tile_pix) > 256:
                 for k in list(self._tile_pix)[:96]:
@@ -1401,7 +1771,7 @@ class SpotifyOverlay(QWidget):
 
     def _fetch_tile(self, url):
         try:
-            req = urllib.request.Request(url, headers={'User-Agent': 'Segue'})
+            req = urllib.request.Request(url, headers={"User-Agent": "Segue"})
             with urllib.request.urlopen(req, timeout=6) as r:
                 data = r.read()
             img = QImage.fromData(data)
@@ -1419,20 +1789,28 @@ class SpotifyOverlay(QWidget):
         """Display queue = cluster shifted by our optimistic offset. Pure (no mutation);
         offset clamped to real depth so rapid skipping can't desync or flash."""
         nq = self._nq
-        if nq and nq.get('autoplay') and self._ap_frozen is not None:
+        if nq and nq.get("autoplay") and self._ap_frozen is not None:
             nq = self._ap_frozen
         if not nq:
             return None
-        tr = (nq.get('prev') or []) + ([nq['current']] if nq.get('current') else []) + (nq.get('next') or [])
+        tr = (
+            (nq.get("prev") or [])
+            + ([nq["current"]] if nq.get("current") else [])
+            + (nq.get("next") or [])
+        )
         if not tr:
             return None
-        base = len(nq.get('prev') or [])
+        base = len(nq.get("prev") or [])
         pos = max(0, min(len(tr) - 1, base + self._opt))
         self._opt = pos - base
         cur = tr[pos]
         if self._hold_uri is not None and self._hold_track is not None:
             cur = self._hold_track
-        return {'current': cur, 'next': tr[pos + 1:pos + 1 + _N_NEXT], 'prev': tr[max(0, pos - _N_PREV):pos]}
+        return {
+            "current": cur,
+            "next": tr[pos + 1 : pos + 1 + _N_NEXT],
+            "prev": tr[max(0, pos - _N_PREV) : pos],
+        }
 
     def _draw_tile(self, p, cx, top, pix, op):
         """One strip cover, centred at column x=cx, top edge `top`, opacity op."""
@@ -1454,9 +1832,11 @@ class SpotifyOverlay(QWidget):
         p.setRenderHint(QPainter.SmoothPixmapTransform)
         if self._move_mode:
             p.save()
-            p.setPen(QPen(QColor('#FF7A1A'), 2, Qt.DashLine))
+            p.setPen(QPen(QColor("#FF7A1A"), 2, Qt.DashLine))
             p.setBrush(QColor(255, 122, 26, 28))
-            p.drawRoundedRect(QRectF(self.rect()).adjusted(1.5, 1.5, -1.5, -1.5), 10, 10)
+            p.drawRoundedRect(
+                QRectF(self.rect()).adjusted(1.5, 1.5, -1.5, -1.5), 10, 10
+            )
             p.restore()
         if self._scale != 1.0:
             p.scale(self._scale, self._scale)
@@ -1467,21 +1847,35 @@ class SpotifyOverlay(QWidget):
         card_cur = None
         card_pix = self._cover_pix
         if self._strip_a > 0.01 and self._queue:
-            cc = self._queue.get('current') or {}
-            cp = self._cover(cc.get('art'), _COVER)
+            cc = self._queue.get("current") or {}
+            cp = self._cover(cc.get("art"), _COVER)
             if cp is not None:
                 self._big_pix, self._big_cur = (cp, cc)
             if self._big_cur is not None and self._big_pix is not None:
                 card_cur, card_pix = (self._big_cur, self._big_pix)
-        elif self._big_cur is not None and self._big_pix is not None and (self._nq and (self._nq.get('current') or {}).get('uri') == self._big_cur.get('uri') or (self._big_cur.get('title') or '') == (self._title or '') or (self._nq and self._nq.get('autoplay') and self._ap_frozen is not None)):
+        elif (
+            self._big_cur is not None
+            and self._big_pix is not None
+            and (
+                self._nq
+                and (self._nq.get("current") or {}).get("uri")
+                == self._big_cur.get("uri")
+                or (self._big_cur.get("title") or "") == (self._title or "")
+                or (
+                    self._nq
+                    and self._nq.get("autoplay")
+                    and self._ap_frozen is not None
+                )
+            )
+        ):
             card_cur, card_pix = (self._big_cur, self._big_pix)
         else:
-            ccur = (self._nq.get('current') if self._nq else None) or {}
-            cpix = self._cover(ccur.get('art'), _COVER) if ccur.get('art') else None
+            ccur = (self._nq.get("current") if self._nq else None) or {}
+            cpix = self._cover(ccur.get("art"), _COVER) if ccur.get("art") else None
             if cpix is not None:
                 self._big_pix, self._big_cur = (cpix, ccur)
                 card_cur, card_pix = (ccur, cpix)
-            elif ccur.get('art') and self._big_pix is not None:
+            elif ccur.get("art") and self._big_pix is not None:
                 card_cur, card_pix = (self._big_cur, self._big_pix)
             else:
                 self._big_cur = None
@@ -1497,12 +1891,24 @@ class SpotifyOverlay(QWidget):
             p.setBrush(QColor(28, 28, 38))
             p.drawRoundedRect(QRectF(_PAD, cy, _COVER, _COVER), _CR, _CR)
         if self._strip_a > 0.01 and self._queue and not self._cover_only:
-            nxt = (self._queue.get('next') or [])[:_N_NEXT]
-            prv = list(reversed((self._queue.get('prev') or [])[-_N_PREV:]))
+            nxt = (self._queue.get("next") or [])[:_N_NEXT]
+            prv = list(reversed((self._queue.get("prev") or [])[-_N_PREV:]))
             for i, t in enumerate(nxt):
-                self._draw_tile(p, ccx, cy + _COVER + _TILE_GAP + i * _TILE_PITCH, self._cover(t.get('art'), _TILE), self._strip_a * max(0.18, 0.62 - i * 0.14))
+                self._draw_tile(
+                    p,
+                    ccx,
+                    cy + _COVER + _TILE_GAP + i * _TILE_PITCH,
+                    self._cover(t.get("art"), _TILE),
+                    self._strip_a * max(0.18, 0.62 - i * 0.14),
+                )
             for i, t in enumerate(prv):
-                self._draw_tile(p, ccx, cy - _TILE_GAP - _TILE - i * _TILE_PITCH, self._cover(t.get('art'), _TILE), self._strip_a * max(0.18, 0.62 - i * 0.14))
+                self._draw_tile(
+                    p,
+                    ccx,
+                    cy - _TILE_GAP - _TILE - i * _TILE_PITCH,
+                    self._cover(t.get("art"), _TILE),
+                    self._strip_a * max(0.18, 0.62 - i * 0.14),
+                )
             p.save()
             p.resetTransform()
             p.setCompositionMode(QPainter.CompositionMode_DestinationOut)
@@ -1522,9 +1928,13 @@ class SpotifyOverlay(QWidget):
         if self._hint_a > 0.01 and not self._compact:
             p.setOpacity(min(1.0, self._hint_a) * 0.92)
             p.setFont(QFont(_FONT, 11))
-            p.setPen(QColor('#b4b4b2'))
+            p.setPen(QColor("#b4b4b2"))
             hy = cy + _COVER + _TILE_GAP + 4
-            p.drawText(QRectF(0, hy, _W, 20), Qt.AlignHCenter | Qt.AlignVCenter, '↕  Scroll to browse')
+            p.drawText(
+                QRectF(0, hy, _W, 20),
+                Qt.AlignHCenter | Qt.AlignVCenter,
+                "↕  Scroll to browse",
+            )
             p.setOpacity(1.0)
         bx, by = (_PAD + 8, cy + _COVER - 8)
         if self._muted:
@@ -1546,16 +1956,16 @@ class SpotifyOverlay(QWidget):
         if self._text_a <= 0.01:
             return None
         p.setOpacity(self._text_a)
-        ct = (card_cur.get('title') if card_cur else None) or self._title or 'No track'
-        ca = (card_cur.get('artist') if card_cur else None) or self._artist or ''
+        ct = (card_cur.get("title") if card_cur else None) or self._title or "No track"
+        ca = (card_cur.get("artist") if card_cur else None) or self._artist or ""
         tx = _PAD + _COVER + 16
         tw = self._text(p, tx, 54, ct, _WHITE, 15, bold=True, maxw=_W - tx - _PAD)
         aw = self._text(p, tx, 81, ca, _DIM, 11, bold=True, maxw=_W - tx - _PAD)
         if not self._move_mode:
-            if self._hover_region == 'title':
+            if self._hover_region == "title":
                 p.setPen(QPen(_WHITE, 1.0))
                 p.drawLine(int(tx), 58, int(tx + tw), 58)
-            elif self._hover_region == 'artist' and ca:
+            elif self._hover_region == "artist" and ca:
                 p.setPen(QPen(_DIM, 1.0))
                 p.drawLine(int(tx), 85, int(tx + aw), 85)
         spk_y = 104

@@ -35,23 +35,31 @@ All WASAPI/COM objects are apartment-bound to the thread that created them.
 activation on the CALLING thread; ``frames()`` and ``close()`` MUST run on that
 same (dedicated worker) thread.
 """
+
 import ctypes
 import ctypes.wintypes
 import sys
 import time
 from ctypes import POINTER
 from typing import Generator, Optional
-if not hasattr(sys, 'coinit_flags'):
+
+if not hasattr(sys, "coinit_flags"):
     sys.coinit_flags = 0
 import psutil
-from comtypes import GUID as _GUID, HRESULT as _COMHRESULT, COMMETHOD as _COMMETHOD, IUnknown as _IUnknown
+from comtypes import (
+    GUID as _GUID,
+    HRESULT as _COMHRESULT,
+    COMMETHOD as _COMMETHOD,
+    IUnknown as _IUnknown,
+)
 from pycaw.api.audioclient import IAudioClient as _IAudioClient
 from pycaw.api.audioclient.depend import WAVEFORMATEX as _PycawWFX
 from fh6_spotify.speech import SAMPLE_RATE, FRAME_BYTES
+
 LPVOID = ctypes.c_void_p
 DWORD = ctypes.wintypes.DWORD
 HRESULT = ctypes.HRESULT
-VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK = 'VAD\\Process_Loopback'
+VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK = "VAD\\Process_Loopback"
 AUDIOCLIENT_ACTIVATION_TYPE_PROCESS_LOOPBACK = 1
 PROCESS_LOOPBACK_MODE_INCLUDE_TARGET_PROCESS_TREE = 0
 PROCESS_LOOPBACK_MODE_EXCLUDE_TARGET_PROCESS_TREE = 1
@@ -61,8 +69,8 @@ AUDCLNT_STREAMFLAGS_EVENTCALLBACK = 262144
 AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM = 2147483648
 AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY = 134217728
 AUDCLNT_BUFFERFLAGS_SILENT = 2
-IID_IAudioClient = '{1CB9AD4C-DBFA-4c32-B178-C2F568A703B2}'
-IID_IAudioCaptureClient = '{C8ADBD64-E71E-48a0-A4DE-185C395CD317}'
+IID_IAudioClient = "{1CB9AD4C-DBFA-4c32-B178-C2F568A703B2}"
+IID_IAudioCaptureClient = "{C8ADBD64-E71E-48a0-A4DE-185C395CD317}"
 WAVE_FORMAT_PCM = 1
 VT_BLOB = 65
 COINIT_MULTITHREADED = 0
@@ -75,16 +83,36 @@ _ACTIVATE_TIMEOUT_MS = 5000
 
 
 class _WAVEFORMATEX(ctypes.Structure):
-    _fields_ = [('wFormatTag', ctypes.wintypes.WORD), ('nChannels', ctypes.wintypes.WORD), ('nSamplesPerSec', DWORD), ('nAvgBytesPerSec', DWORD), ('nBlockAlign', ctypes.wintypes.WORD), ('wBitsPerSample', ctypes.wintypes.WORD), ('cbSize', ctypes.wintypes.WORD)]
+    _fields_ = [
+        ("wFormatTag", ctypes.wintypes.WORD),
+        ("nChannels", ctypes.wintypes.WORD),
+        ("nSamplesPerSec", DWORD),
+        ("nAvgBytesPerSec", DWORD),
+        ("nBlockAlign", ctypes.wintypes.WORD),
+        ("wBitsPerSample", ctypes.wintypes.WORD),
+        ("cbSize", ctypes.wintypes.WORD),
+    ]
 
 
 class _PROPVARIANT(ctypes.Structure):
-    _fields_ = [('vt', ctypes.c_ushort), ('r1', ctypes.c_ushort), ('r2', ctypes.c_ushort), ('r3', ctypes.c_ushort), ('blob_cb', DWORD), ('blob_ptr', LPVOID)]
+    _fields_ = [
+        ("vt", ctypes.c_ushort),
+        ("r1", ctypes.c_ushort),
+        ("r2", ctypes.c_ushort),
+        ("r3", ctypes.c_ushort),
+        ("blob_cb", DWORD),
+        ("blob_ptr", LPVOID),
+    ]
 
 
 class _AUDIOCLIENT_ACTIVATION_PARAMS(ctypes.Structure):
     """ActivationType + AUDIOCLIENT_PROCESS_LOOPBACK_PARAMS{TargetPid, Mode}."""
-    _fields_ = [('ActivationType', DWORD), ('TargetProcessId', DWORD), ('ProcessLoopbackMode', DWORD)]
+
+    _fields_ = [
+        ("ActivationType", DWORD),
+        ("TargetProcessId", DWORD),
+        ("ProcessLoopbackMode", DWORD),
+    ]
 
 
 _QI_T = ctypes.WINFUNCTYPE(HRESULT, LPVOID, LPVOID, POINTER(LPVOID))
@@ -94,11 +122,11 @@ _AC_T = ctypes.WINFUNCTYPE(HRESULT, LPVOID, LPVOID)
 
 
 class _HandlerVtbl(ctypes.Structure):
-    _fields_ = [('QI', _QI_T), ('AR', _AR_T), ('RL', _RL_T), ('AC', _AC_T)]
+    _fields_ = [("QI", _QI_T), ("AR", _AR_T), ("RL", _RL_T), ("AC", _AC_T)]
 
 
 class _HandlerObj(ctypes.Structure):
-    _fields_ = [('v', POINTER(_HandlerVtbl))]
+    _fields_ = [("v", POINTER(_HandlerVtbl))]
 
 
 def _make_completion_handler(event_handle):
@@ -142,16 +170,25 @@ def _raw_vtable_call(ptr, idx, restype, *typed_args):
 class _IAudioCaptureClient(_IUnknown):
     _iid_ = _GUID(IID_IAudioCaptureClient)
     _methods_ = [
-        _COMMETHOD([], _COMHRESULT, 'GetBuffer',
-            (['out'], POINTER(LPVOID), 'ppData'),
-            (['out'], POINTER(ctypes.c_uint), 'pNumFramesToRead'),
-            (['out'], POINTER(DWORD), 'pdwFlags'),
-            (['out'], POINTER(ctypes.c_ulonglong), 'pu64DevicePosition'),
-            (['out'], POINTER(ctypes.c_ulonglong), 'pu64QPCPosition')),
-        _COMMETHOD([], _COMHRESULT, 'ReleaseBuffer',
-            (['in'], ctypes.c_uint, 'NumFramesRead')),
-        _COMMETHOD([], _COMHRESULT, 'GetNextPacketSize',
-            (['out'], POINTER(ctypes.c_uint), 'pNumFramesInNextPacket')),
+        _COMMETHOD(
+            [],
+            _COMHRESULT,
+            "GetBuffer",
+            (["out"], POINTER(LPVOID), "ppData"),
+            (["out"], POINTER(ctypes.c_uint), "pNumFramesToRead"),
+            (["out"], POINTER(DWORD), "pdwFlags"),
+            (["out"], POINTER(ctypes.c_ulonglong), "pu64DevicePosition"),
+            (["out"], POINTER(ctypes.c_ulonglong), "pu64QPCPosition"),
+        ),
+        _COMMETHOD(
+            [], _COMHRESULT, "ReleaseBuffer", (["in"], ctypes.c_uint, "NumFramesRead")
+        ),
+        _COMMETHOD(
+            [],
+            _COMHRESULT,
+            "GetNextPacketSize",
+            (["out"], POINTER(ctypes.c_uint), "pNumFramesInNextPacket"),
+        ),
     ]
 
 
@@ -163,11 +200,14 @@ def _find_pid(process_name: str) -> int:
     Raises ProcessNotFoundError if none."""
     target = process_name.lower()
     matches = {}
-    for proc in psutil.process_iter(['name', 'pid', 'ppid']):
-        if (proc.info.get('name') or '').lower() == target:
-            matches[proc.info['pid']] = proc.info.get('ppid')
+    for proc in psutil.process_iter(["name", "pid", "ppid"]):
+        if (proc.info.get("name") or "").lower() == target:
+            matches[proc.info["pid"]] = proc.info.get("ppid")
     if not matches:
-        raise ProcessNotFoundError('No running process named %r. Is the target application started?' % (process_name,))
+        raise ProcessNotFoundError(
+            "No running process named %r. Is the target application started?"
+            % (process_name,)
+        )
     for pid, ppid in matches.items():
         if ppid not in matches:
             return pid
@@ -185,7 +225,14 @@ class ProcessLoopbackCapture:
     are bound to the thread that runs ``__init__``; ``frames()`` and ``close()``
     MUST run on that same thread."""
 
-    def __init__(self, process_name: str, exclude: bool=False, sample_rate: int=None, channels: int=1, frame_ms: int=20) -> None:
+    def __init__(
+        self,
+        process_name: str,
+        exclude: bool = False,
+        sample_rate: int = None,
+        channels: int = 1,
+        frame_ms: int = 20,
+    ) -> None:
         self.process_name = process_name
         self._exclude = exclude
         self._rate = int(sample_rate or SAMPLE_RATE)
@@ -202,7 +249,7 @@ class ProcessLoopbackCapture:
         hr = ctypes.windll.ole32.CoInitializeEx(None, COINIT_MULTITHREADED)
         self._we_init_com = hr == _S_OK
         if hr not in (_S_OK, _S_FALSE, _RPC_E_CHANGED_MODE):
-            raise RuntimeError(f'CoInitializeEx failed: 0x{hr & 4294967295:08X}')
+            raise RuntimeError(f"CoInitializeEx failed: 0x{hr & 4294967295:08X}")
         self.pid = _find_pid(process_name)
         try:
             self._open(self.pid)
@@ -221,8 +268,14 @@ class ProcessLoopbackCapture:
         fmt.nAvgBytesPerSec = fmt.nSamplesPerSec * fmt.nBlockAlign
         fmt.cbSize = 0
         self._block_align = fmt.nBlockAlign
-        mode = PROCESS_LOOPBACK_MODE_EXCLUDE_TARGET_PROCESS_TREE if self._exclude else PROCESS_LOOPBACK_MODE_INCLUDE_TARGET_PROCESS_TREE
-        ap = _AUDIOCLIENT_ACTIVATION_PARAMS(AUDIOCLIENT_ACTIVATION_TYPE_PROCESS_LOOPBACK, pid, mode)
+        mode = (
+            PROCESS_LOOPBACK_MODE_EXCLUDE_TARGET_PROCESS_TREE
+            if self._exclude
+            else PROCESS_LOOPBACK_MODE_INCLUDE_TARGET_PROCESS_TREE
+        )
+        ap = _AUDIOCLIENT_ACTIVATION_PARAMS(
+            AUDIOCLIENT_ACTIVATION_TYPE_PROCESS_LOOPBACK, pid, mode
+        )
         pv = _PROPVARIANT()
         pv.vt = VT_BLOB
         pv.blob_cb = ctypes.sizeof(ap)
@@ -230,29 +283,57 @@ class ProcessLoopbackCapture:
         activate_evt = ctypes.windll.kernel32.CreateEventW(None, True, False, None)
         handler, vtbl, cbs = _make_completion_handler(activate_evt)
         self._handler_keepalive = (handler, vtbl, cbs)
-        fn = ctypes.WinDLL('Mmdevapi.dll').ActivateAudioInterfaceAsync
+        fn = ctypes.WinDLL("Mmdevapi.dll").ActivateAudioInterfaceAsync
         fn.restype = HRESULT
         aop = LPVOID()
         iid_ac = _GUID(IID_IAudioClient)
-        hr = fn(ctypes.c_wchar_p(VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK), ctypes.byref(iid_ac), ctypes.byref(pv), ctypes.byref(handler), ctypes.byref(aop))
+        hr = fn(
+            ctypes.c_wchar_p(VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK),
+            ctypes.byref(iid_ac),
+            ctypes.byref(pv),
+            ctypes.byref(handler),
+            ctypes.byref(aop),
+        )
         if hr != 0:
             ctypes.windll.kernel32.CloseHandle(activate_evt)
-            raise RuntimeError(f'ActivateAudioInterfaceAsync failed: 0x{hr & 4294967295:08X}')
+            raise RuntimeError(
+                f"ActivateAudioInterfaceAsync failed: 0x{hr & 4294967295:08X}"
+            )
         ctypes.windll.kernel32.WaitForSingleObject(activate_evt, _ACTIVATE_TIMEOUT_MS)
         ctypes.windll.kernel32.CloseHandle(activate_evt)
         ahr = HRESULT()
         aunk = LPVOID()
-        _raw_vtable_call(aop, 3, HRESULT, (POINTER(HRESULT), ctypes.pointer(ahr)), (POINTER(LPVOID), ctypes.pointer(aunk)))
+        _raw_vtable_call(
+            aop,
+            3,
+            HRESULT,
+            (POINTER(HRESULT), ctypes.pointer(ahr)),
+            (POINTER(LPVOID), ctypes.pointer(aunk)),
+        )
         _raw_vtable_call(aop, 2, ctypes.c_ulong)
         if ahr.value != 0 or not aunk.value:
-            raise RuntimeError(f'GetActivateResult failed: 0x{ahr.value & 4294967295:08X} (activation refused; common cause: target pid not rendering, or Windows build < 19041)')
+            raise RuntimeError(
+                f"GetActivateResult failed: 0x{ahr.value & 4294967295:08X} (activation refused; common cause: target pid not rendering, or Windows build < 19041)"
+            )
         client = ctypes.cast(aunk.value, POINTER(_IAudioClient))
-        stream_flags = AUDCLNT_STREAMFLAGS_LOOPBACK | AUDCLNT_STREAMFLAGS_EVENTCALLBACK | AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY
+        stream_flags = (
+            AUDCLNT_STREAMFLAGS_LOOPBACK
+            | AUDCLNT_STREAMFLAGS_EVENTCALLBACK
+            | AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM
+            | AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY
+        )
         fmt_ptr = ctypes.cast(ctypes.pointer(fmt), POINTER(_PycawWFX))
         try:
-            client.Initialize(AUDCLNT_SHAREMODE_SHARED, stream_flags, _BUFFER_DURATION_REFTIME, 0, fmt_ptr, None)
+            client.Initialize(
+                AUDCLNT_SHAREMODE_SHARED,
+                stream_flags,
+                _BUFFER_DURATION_REFTIME,
+                0,
+                fmt_ptr,
+                None,
+            )
         except Exception as e:
-            raise RuntimeError(f'IAudioClient.Initialize failed: {e!r}')
+            raise RuntimeError(f"IAudioClient.Initialize failed: {e!r}")
         data_evt = ctypes.windll.kernel32.CreateEventW(None, False, False, None)
         client.SetEventHandle(data_evt)
         cc_iid = _GUID(IID_IAudioCaptureClient)
@@ -267,7 +348,7 @@ class ProcessLoopbackCapture:
         """True once a process-loopback stream was successfully opened."""
         return self._available
 
-    def frames(self, heartbeat: bool=False) -> Generator[bytes, None, None]:
+    def frames(self, heartbeat: bool = False) -> Generator[bytes, None, None]:
         """Yields exactly FRAME_BYTES (640) bytes per iteration: 16-bit signed
         PCM, mono, 16000 Hz, little-endian (20 ms). Blocks on the engine's
         data-ready event. Packets arrive in ~10 ms / 320-byte chunks; they are
@@ -275,7 +356,7 @@ class ProcessLoopbackCapture:
         remainder between reads. heartbeat=True also yields b"" ~every half
         second while no packets arrive so the consumer can notice a dead stream."""
         if not self._available or self._client is None:
-            raise RuntimeError('Capture is not available / already closed.')
+            raise RuntimeError("Capture is not available / already closed.")
         if not self._started:
             self._client.Start()
             self._started = True
@@ -289,7 +370,7 @@ class ProcessLoopbackCapture:
                 now = time.monotonic()
                 if now - last_emit > 0.5:
                     last_emit = now
-                    yield b''
+                    yield b""
             while True:
                 try:
                     nframes = capture.GetNextPacketSize()
@@ -303,7 +384,7 @@ class ProcessLoopbackCapture:
                         nbytes = frames * block_align
                         buf = self._leftover
                         if flags & AUDCLNT_BUFFERFLAGS_SILENT:
-                            buf.extend(b'\x00' * nbytes)
+                            buf.extend(b"\x00" * nbytes)
                         else:
                             buf.extend(ctypes.string_at(data, nbytes))
                 finally:
@@ -314,7 +395,7 @@ class ProcessLoopbackCapture:
                 fb = self._frame_bytes
                 while offset + fb <= end:
                     last_emit = time.monotonic()
-                    yield bytes(buf[offset:offset + fb])
+                    yield bytes(buf[offset : offset + fb])
                     offset += fb
                 if offset:
                     del buf[:offset]
@@ -338,7 +419,7 @@ class ProcessLoopbackCapture:
         self._uninit_com()
 
     def _uninit_com(self) -> None:
-        if getattr(self, '_we_init_com', False):
+        if getattr(self, "_we_init_com", False):
             try:
                 ctypes.windll.ole32.CoUninitialize()
             except Exception:
@@ -353,24 +434,33 @@ class SystemAudioCapture:
     resampled to ``sample_rate``, and yields b"" as a heartbeat when no audio is
     flowing. Backed by pyaudiowpatch."""
 
-    def __init__(self, sample_rate: int=48000, channels: int=2, frame_ms: int=10):
+    def __init__(self, sample_rate: int = 48000, channels: int = 2, frame_ms: int = 10):
         import pyaudiowpatch as pyaudio
+
         self._sr = int(sample_rate)
         self._pa = pyaudio.PyAudio()
         info = self._pa.get_default_wasapi_loopback()
-        self._src_rate = int(info['defaultSampleRate'])
-        self._src_ch = max(int(info['maxInputChannels']), 2)
+        self._src_rate = int(info["defaultSampleRate"])
+        self._src_ch = max(int(info["maxInputChannels"]), 2)
         self._chunk = max(1, int(self._src_rate * frame_ms / 1000))
-        self._stream = self._pa.open(format=pyaudio.paInt16, channels=self._src_ch, rate=self._src_rate, input=True, input_device_index=int(info['index']), frames_per_buffer=self._chunk)
+        self._stream = self._pa.open(
+            format=pyaudio.paInt16,
+            channels=self._src_ch,
+            rate=self._src_rate,
+            input=True,
+            input_device_index=int(info["index"]),
+            frames_per_buffer=self._chunk,
+        )
 
-    def frames(self, heartbeat: bool=False):
+    def frames(self, heartbeat: bool = False):
         import numpy as np
+
         while True:
             try:
                 raw = self._stream.read(self._chunk, exception_on_overflow=False)
                 if not raw:
                     if heartbeat:
-                        yield b''
+                        yield b""
                     continue
                 a = np.frombuffer(raw, dtype=np.int16)
                 if self._src_ch != 2:
@@ -381,7 +471,7 @@ class SystemAudioCapture:
                     n_out = int(m * self._sr / self._src_rate)
                     if n_out < 1:
                         if heartbeat:
-                            yield b''
+                            yield b""
                         continue
                     xs = np.linspace(0.0, m - 1, n_out)
                     x0 = np.arange(m)
@@ -393,7 +483,7 @@ class SystemAudioCapture:
                     yield a.tobytes()
             except Exception:
                 if heartbeat:
-                    yield b''
+                    yield b""
                 return
 
     def close(self) -> None:
@@ -408,7 +498,7 @@ class SystemAudioCapture:
             return None
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import math
     import struct
 
@@ -416,25 +506,25 @@ if __name__ == '__main__':
         n = len(data) // 2
         if not n:
             return 0.0
-        samples = struct.unpack(f'<{n}h', data)
+        samples = struct.unpack(f"<{n}h", data)
         return math.sqrt(sum(s * s for s in samples) / n)
 
-    name = sys.argv[1] if len(sys.argv) > 1 else 'Spotify.exe'
-    print(f'[*] Windows build: {sys.getwindowsversion().build} (needs >= 19041)')
-    print(f'[*] ProcessLoopbackCapture self-test - target {name!r}, 50 frames...')
+    name = sys.argv[1] if len(sys.argv) > 1 else "Spotify.exe"
+    print(f"[*] Windows build: {sys.getwindowsversion().build} (needs >= 19041)")
+    print(f"[*] ProcessLoopbackCapture self-test - target {name!r}, 50 frames...")
     cap = ProcessLoopbackCapture(name)
-    print(f'    pid={cap.pid} available={cap.available}')
+    print(f"    pid={cap.pid} available={cap.available}")
     nonzero = 0
     try:
         for i, frame in enumerate(cap.frames()):
-            assert len(frame) == FRAME_BYTES, f'Bad frame size: {len(frame)}'
+            assert len(frame) == FRAME_BYTES, f"Bad frame size: {len(frame)}"
             r = _rms(frame)
             if r > 1.0:
                 nonzero += 1
             if i < 5 or (i + 1) % 10 == 0:
-                print(f'    frame {i + 1:>3}: {len(frame)} bytes  RMS={r:8.1f}')
+                print(f"    frame {i + 1:>3}: {len(frame)} bytes  RMS={r:8.1f}")
             if i >= 49:
                 break
     finally:
         cap.close()
-    print(f'[*] Done. nonzero-RMS frames: {nonzero}/50')
+    print(f"[*] Done. nonzero-RMS frames: {nonzero}/50")

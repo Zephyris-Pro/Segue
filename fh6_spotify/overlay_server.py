@@ -15,132 +15,138 @@ Routes:
 Reads the shared live `ui` dict that runner.py updates. Runs in a daemon thread; all
 failures are swallowed so it can never take the app down.
 """
+
 from __future__ import annotations
 import json
 import os
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-_LOGO_PATH = os.path.join(os.path.dirname(__file__), 'assets', 'Segue logo in bottom ui.png')
-_KOFI_PATH = os.path.join(os.path.dirname(__file__), 'assets', 'kofi_logo.png')
-_DISCORD_PATH = os.path.join(os.path.dirname(__file__), 'assets', 'Discord_logo_blue.png')
-_INTER_PATH = os.path.join(os.path.dirname(__file__), 'assets', 'Inter.ttf')
-_VIZ_JS_PATH = os.path.join(os.path.dirname(__file__), 'assets', 'viz_layer.js')
+
+_LOGO_PATH = os.path.join(
+    os.path.dirname(__file__), "assets", "Segue logo in bottom ui.png"
+)
+_KOFI_PATH = os.path.join(os.path.dirname(__file__), "assets", "kofi_logo.png")
+_DISCORD_PATH = os.path.join(
+    os.path.dirname(__file__), "assets", "Discord_logo_blue.png"
+)
+_INTER_PATH = os.path.join(os.path.dirname(__file__), "assets", "Inter.ttf")
+_VIZ_JS_PATH = os.path.join(os.path.dirname(__file__), "assets", "viz_layer.js")
 BOOT_ID = str(int(time.time() * 1000))
 DEFAULT_PORT = 7345
 DEFAULT_PRESET = {
-    'show_art': True,
-    'cover_radius': 20,
-    'cover_filter': 'none',
-    'bg_enabled': True,
-    'bg_color': '#2b2b29',
-    'bg_color2': '#141414',
-    'bg_opacity': 0.85,
-    'bg_radius': 13,
-    'cover_bg': False,
-    'clip_cover': False,
-    'bg_auto': False,
-    'bg_grad': False,
-    'bg_grad_user': False,
-    'bg_grad_angle': 135,
-    'accent_auto': False,
-    'text_align': 'left',
-    'time_align': 'left',
-    'text_color': '#ffffff',
-    'sub_color': '#c8c8d0',
-    'accent': '#ffffff',
-    'show_title': True,
-    'show_artist': True,
-    'show_bars': True,
-    'show_prog': True,
-    'show_vol': False,
-    'show_time': False,
-    'show_video': False,
-    'video_url': '',
-    'video_fit': 'cover',
-    'video_radius': 0,
-    'vol_style': 'arcs',
-    'bars_attach': True,
-    'bars_n': 5,
-    'bars_gap': 0.4,
-    'bars_round': True,
-    'bars_glow': False,
-    'bars_reactive': True,
-    'show_viz': False,
-    'viz_radius': 0,
-    'viz': {
-        'mode': 'lava',
-        'auto': True,
-        'speed': 1.8,
-        'scale': 1.5,
-        'sharp': 0.1,
-        'vintage': 0.9,
-        'rattle': 0.4,
-        'smooth': 0.35,
-        'flash': 0.1,
-        'palCount': 5,
-        'beatPal': 'off',
-        'mono': False,
-        'spectrum': False,
-        'pal': ['#ff5e3a', '#ff1b6b', '#1a0b2e', '#ffc04d', '#ffe9d6'],
-        'lock': [False, False, False, False, False],
+    "show_art": True,
+    "cover_radius": 20,
+    "cover_filter": "none",
+    "bg_enabled": True,
+    "bg_color": "#2b2b29",
+    "bg_color2": "#141414",
+    "bg_opacity": 0.85,
+    "bg_radius": 13,
+    "cover_bg": False,
+    "clip_cover": False,
+    "bg_auto": False,
+    "bg_grad": False,
+    "bg_grad_user": False,
+    "bg_grad_angle": 135,
+    "accent_auto": False,
+    "text_align": "left",
+    "time_align": "left",
+    "text_color": "#ffffff",
+    "sub_color": "#c8c8d0",
+    "accent": "#ffffff",
+    "show_title": True,
+    "show_artist": True,
+    "show_bars": True,
+    "show_prog": True,
+    "show_vol": False,
+    "show_time": False,
+    "show_video": False,
+    "video_url": "",
+    "video_fit": "cover",
+    "video_radius": 0,
+    "vol_style": "arcs",
+    "bars_attach": True,
+    "bars_n": 5,
+    "bars_gap": 0.4,
+    "bars_round": True,
+    "bars_glow": False,
+    "bars_reactive": True,
+    "show_viz": False,
+    "viz_radius": 0,
+    "viz": {
+        "mode": "lava",
+        "auto": True,
+        "speed": 1.8,
+        "scale": 1.5,
+        "sharp": 0.1,
+        "vintage": 0.9,
+        "rattle": 0.4,
+        "smooth": 0.35,
+        "flash": 0.1,
+        "palCount": 5,
+        "beatPal": "off",
+        "mono": False,
+        "spectrum": False,
+        "pal": ["#ff5e3a", "#ff1b6b", "#1a0b2e", "#ffc04d", "#ffe9d6"],
+        "lock": [False, False, False, False, False],
     },
-    'layout': {
-        'cw': 300,
-        'ch': 240,
-        'bg': {
-            'x': 0,
-            'y': 0,
-            'w': 252,
-            'h': 84,
+    "layout": {
+        "cw": 300,
+        "ch": 240,
+        "bg": {
+            "x": 0,
+            "y": 0,
+            "w": 252,
+            "h": 84,
         },
-        'cover': {
-            'x': 12,
-            'y': 12,
-            'size': 60,
+        "cover": {
+            "x": 12,
+            "y": 12,
+            "size": 60,
         },
-        'text': {
-            'x': 84,
-            'y': 20,
-            'scale': 1,
+        "text": {
+            "x": 84,
+            "y": 20,
+            "scale": 1,
         },
-        'bars': {
-            'x': 150,
-            'y': 40,
-            'w': 40,
-            'h': 14,
+        "bars": {
+            "x": 150,
+            "y": 40,
+            "w": 40,
+            "h": 14,
         },
-        'prog': {
-            'x': 84,
-            'y': 74,
-            'w': 150,
-            'h': 4,
+        "prog": {
+            "x": 84,
+            "y": 74,
+            "w": 150,
+            "h": 4,
         },
-        'vol': {
-            'x': 196,
-            'y': 86,
-            'w': 50,
-            'h': 38,
+        "vol": {
+            "x": 196,
+            "y": 86,
+            "w": 50,
+            "h": 38,
         },
-        'time': {
-            'x': 84,
-            'y': 92,
-            'w': 96,
-            'h': 16,
+        "time": {
+            "x": 84,
+            "y": 92,
+            "w": 96,
+            "h": 16,
         },
-        'video': {
-            'x': 0,
-            'y': 0,
-            'w': 252,
-            'h': 84,
+        "video": {
+            "x": 0,
+            "y": 0,
+            "w": 252,
+            "h": 84,
         },
-        'viz': {
-            'x': 0,
-            'y': 0,
-            'w': 252,
-            'h': 84,
+        "viz": {
+            "x": 0,
+            "y": 0,
+            "w": 252,
+            "h": 84,
         },
-        'order': ['bg', 'viz', 'video', 'cover', 'text', 'bars', 'prog', 'vol', 'time'],
+        "order": ["bg", "viz", "video", "cover", "text", "bars", "prog", "vol", "time"],
     },
 }
 _OVERLAY_HTML = """<!doctype html><html><head><meta charset="utf-8"><title>Segue overlay</title>
@@ -1492,14 +1498,14 @@ class _Handler(BaseHTTPRequestHandler):
     def log_message(self, *a):
         return None
 
-    def _send(self, code, ctype, body=b'', no_cache=False):
+    def _send(self, code, ctype, body=b"", no_cache=False):
         try:
             self.send_response(code)
-            self.send_header('Content-Type', ctype)
-            self.send_header('Content-Length', str(len(body)))
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(body)))
             self._send_cors()
             if no_cache:
-                self.send_header('Cache-Control', 'no-store')
+                self.send_header("Cache-Control", "no-store")
             self.end_headers()
             if body:
                 self.wfile.write(body)
@@ -1507,12 +1513,16 @@ class _Handler(BaseHTTPRequestHandler):
             pass
 
     def _allowed_origin(self):
-        o = self.headers.get('Origin')
+        o = self.headers.get("Origin")
         if not o:
             return None
-        if o == 'https://getsegue.app':
+        if o == "https://getsegue.app":
             return o
-        if o in ('http://localhost', 'http://127.0.0.1') or o.startswith('http://localhost:') or o.startswith('http://127.0.0.1:'):
+        if (
+            o in ("http://localhost", "http://127.0.0.1")
+            or o.startswith("http://localhost:")
+            or o.startswith("http://127.0.0.1:")
+        ):
             return o
         return None
 
@@ -1520,172 +1530,246 @@ class _Handler(BaseHTTPRequestHandler):
         o = self._allowed_origin()
         if not o:
             return None
-        self.send_header('Access-Control-Allow-Origin', o)
-        self.send_header('Vary', 'Origin')
-        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
-        self.send_header('Access-Control-Allow-Private-Network', 'true')
+        self.send_header("Access-Control-Allow-Origin", o)
+        self.send_header("Vary", "Origin")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Private-Network", "true")
 
     def do_OPTIONS(self):
         try:
             self.send_response(204)
             self._send_cors()
-            self.send_header('Content-Length', '0')
+            self.send_header("Content-Length", "0")
             self.end_headers()
         except Exception:
             pass
 
     def do_GET(self):
         try:
-            ui = getattr(self.server, 'ui', {}) or {}
-            path = self.path.split('?', 1)[0]
-            if path in ('/', '/overlay', '/index.html'):
-                self._send(200, 'text/html; charset=utf-8', _OVERLAY_HTML.encode('utf-8'))
+            ui = getattr(self.server, "ui", {}) or {}
+            path = self.path.split("?", 1)[0]
+            if path in ("/", "/overlay", "/index.html"):
+                self._send(
+                    200, "text/html; charset=utf-8", _OVERLAY_HTML.encode("utf-8")
+                )
                 return None
-            if path == '/np':
-                title = ui.get('np_title', '') or ''
-                artist = ui.get('np_artist', '') or ''
-                thumb = ui.get('np_thumb')
-                ver = hash((title, artist, bytes(thumb) if thumb else b'')) & 4294967295
-                body = json.dumps({'title': title, 'artist': artist, 'playing': bool(ui.get('np_playing', False)), 'app': ui.get('np_app', '') or '', 'pos': float(ui.get('np_pos', 0.0) or 0.0), 'dur': float(ui.get('np_dur', 0.0) or 0.0), 'art': bool(thumb), 'video': ui.get('np_video', '') or '', 'ver': str(ver), 'volume': float(ui.get('volume', 1.0) or 0.0), 'bars': getattr(self.server, 'bars', None).levels if getattr(self.server, 'bars', None) is not None else None}).encode('utf-8')
-                self._send(200, 'application/json', body, no_cache=True)
+            if path == "/np":
+                title = ui.get("np_title", "") or ""
+                artist = ui.get("np_artist", "") or ""
+                thumb = ui.get("np_thumb")
+                ver = hash((title, artist, bytes(thumb) if thumb else b"")) & 4294967295
+                body = json.dumps(
+                    {
+                        "title": title,
+                        "artist": artist,
+                        "playing": bool(ui.get("np_playing", False)),
+                        "app": ui.get("np_app", "") or "",
+                        "pos": float(ui.get("np_pos", 0.0) or 0.0),
+                        "dur": float(ui.get("np_dur", 0.0) or 0.0),
+                        "art": bool(thumb),
+                        "video": ui.get("np_video", "") or "",
+                        "ver": str(ver),
+                        "volume": float(ui.get("volume", 1.0) or 0.0),
+                        "bars": getattr(self.server, "bars", None).levels
+                        if getattr(self.server, "bars", None) is not None
+                        else None,
+                    }
+                ).encode("utf-8")
+                self._send(200, "application/json", body, no_cache=True)
                 return None
-            if path == '/bars':
-                _b = getattr(self.server, 'bars', None)
-                _payload = {'bars': _b.levels if _b is not None else None}
+            if path == "/bars":
+                _b = getattr(self.server, "bars", None)
+                _payload = {"bars": _b.levels if _b is not None else None}
                 if _b is not None:
-                    _payload['excite'] = float(getattr(_b, 'excite', 0.0))
-                    _lufs_s = getattr(_b, 'lufs_s', None)
+                    _payload["excite"] = float(getattr(_b, "excite", 0.0))
+                    _lufs_s = getattr(_b, "lufs_s", None)
                     if _lufs_s is not None:
-                        _payload['lufs_s'] = float(_lufs_s)
-                    _lufs_m = getattr(_b, 'lufs_m', None)
+                        _payload["lufs_s"] = float(_lufs_s)
+                    _lufs_m = getattr(_b, "lufs_m", None)
                     if _lufs_m is not None:
-                        _payload['lufs_m'] = float(_lufs_m)
-                self._send(200, 'application/json', json.dumps(_payload).encode('utf-8'), no_cache=True)
+                        _payload["lufs_m"] = float(_lufs_m)
+                self._send(
+                    200,
+                    "application/json",
+                    json.dumps(_payload).encode("utf-8"),
+                    no_cache=True,
+                )
                 return None
-            if path == '/boot':
-                self._send(200, 'application/json', json.dumps({'boot': BOOT_ID}).encode('utf-8'), no_cache=True)
+            if path == "/boot":
+                self._send(
+                    200,
+                    "application/json",
+                    json.dumps({"boot": BOOT_ID}).encode("utf-8"),
+                    no_cache=True,
+                )
                 return None
-            if path == '/art':
-                data = ui.get('np_thumb')
+            if path == "/art":
+                data = ui.get("np_thumb")
                 if not data:
-                    self._send(204, 'image/png', b'')
+                    self._send(204, "image/png", b"")
                     return None
-                self._send(200, 'image/png', bytes(data), no_cache=True)
+                self._send(200, "image/png", bytes(data), no_cache=True)
                 return None
-            if path == '/preset':
-                preset = getattr(self.server, 'preset', DEFAULT_PRESET)
-                self._send(200, 'application/json', json.dumps(preset).encode('utf-8'), no_cache=True)
+            if path == "/preset":
+                preset = getattr(self.server, "preset", DEFAULT_PRESET)
+                self._send(
+                    200,
+                    "application/json",
+                    json.dumps(preset).encode("utf-8"),
+                    no_cache=True,
+                )
                 return None
-            if path == '/presets':
-                pr = getattr(self.server, 'presets', {}) or {}
-                self._send(200, 'application/json', json.dumps({'names': sorted(pr), 'active': getattr(self.server, 'preset_name', '')}).encode('utf-8'), no_cache=True)
+            if path == "/presets":
+                pr = getattr(self.server, "presets", {}) or {}
+                self._send(
+                    200,
+                    "application/json",
+                    json.dumps(
+                        {
+                            "names": sorted(pr),
+                            "active": getattr(self.server, "preset_name", ""),
+                        }
+                    ).encode("utf-8"),
+                    no_cache=True,
+                )
                 return None
-            if path == '/editor':
-                self._send(200, 'text/html; charset=utf-8', _EDITOR_HTML.encode('utf-8'))
+            if path == "/editor":
+                self._send(
+                    200, "text/html; charset=utf-8", _EDITOR_HTML.encode("utf-8")
+                )
                 return None
-            if path == '/logo':
+            if path == "/logo":
                 try:
-                    with open(_LOGO_PATH, 'rb') as f:
-                        self._send(200, 'image/png', f.read())
+                    with open(_LOGO_PATH, "rb") as f:
+                        self._send(200, "image/png", f.read())
                     return None
                 except Exception:
-                    self._send(404, 'image/png', b'')
+                    self._send(404, "image/png", b"")
                     return None
-            if path == '/font/inter.ttf':
+            if path == "/font/inter.ttf":
                 try:
-                    with open(_INTER_PATH, 'rb') as f:
-                        self._send(200, 'font/ttf', f.read())
+                    with open(_INTER_PATH, "rb") as f:
+                        self._send(200, "font/ttf", f.read())
                     return None
                 except Exception:
-                    self._send(404, 'font/ttf', b'')
+                    self._send(404, "font/ttf", b"")
                     return None
-            if path == '/viz_layer.js':
+            if path == "/viz_layer.js":
                 try:
-                    with open(_VIZ_JS_PATH, 'rb') as f:
-                        self._send(200, 'application/javascript', f.read())
+                    with open(_VIZ_JS_PATH, "rb") as f:
+                        self._send(200, "application/javascript", f.read())
                     return None
                 except Exception:
-                    self._send(404, 'application/javascript', b'')
+                    self._send(404, "application/javascript", b"")
                     return None
-            if path in ('/kofi.png', '/discord.png'):
+            if path in ("/kofi.png", "/discord.png"):
                 try:
-                    with open(_KOFI_PATH if path == '/kofi.png' else _DISCORD_PATH, 'rb') as f:
-                        self._send(200, 'image/png', f.read())
+                    with open(
+                        _KOFI_PATH if path == "/kofi.png" else _DISCORD_PATH, "rb"
+                    ) as f:
+                        self._send(200, "image/png", f.read())
                     return None
                 except Exception:
-                    self._send(404, 'image/png', b'')
+                    self._send(404, "image/png", b"")
                     return None
-            self._send(404, 'text/plain', b'not found')
+            self._send(404, "text/plain", b"not found")
         except Exception:
             pass
 
     def _persist_presets(self):
-        cb = getattr(self.server, 'on_persist', None)
+        cb = getattr(self.server, "on_persist", None)
         if cb:
             try:
-                cb(dict(getattr(self.server, 'presets', {}) or {}), getattr(self.server, 'preset_name', ''))
+                cb(
+                    dict(getattr(self.server, "presets", {}) or {}),
+                    getattr(self.server, "preset_name", ""),
+                )
             except Exception:
                 pass
 
     def do_POST(self):
         from urllib.parse import urlparse, parse_qs
+
         u = urlparse(self.path)
         path = u.path
         q = {k: v[0] for k, v in parse_qs(u.query).items()}
         try:
             try:
-                n = int(self.headers.get('Content-Length', 0) or 0)
-                body = json.loads(self.rfile.read(n).decode('utf-8')) if n else {}
+                n = int(self.headers.get("Content-Length", 0) or 0)
+                body = json.loads(self.rfile.read(n).decode("utf-8")) if n else {}
             except Exception:
                 body = {}
-            presets = getattr(self.server, 'presets', None)
-            if path == '/preset':
+            presets = getattr(self.server, "presets", None)
+            if path == "/preset":
                 if isinstance(body, dict):
                     self.server.preset = dict(DEFAULT_PRESET, **body)
-                    cb = getattr(self.server, 'on_save', None)
+                    cb = getattr(self.server, "on_save", None)
                     if cb:
                         cb(dict(self.server.preset))
-                self._send(200, 'application/json', b'{"ok":true}', no_cache=True)
+                self._send(200, "application/json", b'{"ok":true}', no_cache=True)
                 return None
-            if path == '/control':
-                act = (body.get('action') if isinstance(body, dict) else '') or ''
-                ui = getattr(self.server, 'ui', None)
-                fn = ui.get('routed_' + act) if ui is not None and act in ('prev', 'playpause', 'next') else None
+            if path == "/control":
+                act = (body.get("action") if isinstance(body, dict) else "") or ""
+                ui = getattr(self.server, "ui", None)
+                fn = (
+                    ui.get("routed_" + act)
+                    if ui is not None and act in ("prev", "playpause", "next")
+                    else None
+                )
                 if fn:
                     fn()
-                self._send(200, 'application/json', b'{"ok":true}', no_cache=True)
+                self._send(200, "application/json", b'{"ok":true}', no_cache=True)
                 return None
-            if path == '/presets/save' and presets is not None:
+            if path == "/presets/save" and presets is not None:
                 if isinstance(body, dict):
-                    name = (q.get('name') or '').strip() or 'Untitled'
+                    name = (q.get("name") or "").strip() or "Untitled"
                     presets[name] = dict(DEFAULT_PRESET, **body)
                     self.server.preset_name = name
                     self._persist_presets()
-                    self._send(200, 'application/json', json.dumps({'ok': True, 'names': sorted(presets), 'active': name}).encode('utf-8'), no_cache=True)
+                    self._send(
+                        200,
+                        "application/json",
+                        json.dumps(
+                            {"ok": True, "names": sorted(presets), "active": name}
+                        ).encode("utf-8"),
+                        no_cache=True,
+                    )
                     return None
-            if path == '/presets/load' and presets is not None:
-                name = (q.get('name') or '').strip()
+            if path == "/presets/load" and presets is not None:
+                name = (q.get("name") or "").strip()
                 if name in presets:
                     self.server.preset = dict(DEFAULT_PRESET, **presets[name])
                     self.server.preset_name = name
-                    cb = getattr(self.server, 'on_save', None)
+                    cb = getattr(self.server, "on_save", None)
                     if cb:
                         cb(dict(self.server.preset))
                     self._persist_presets()
-                    self._send(200, 'application/json', json.dumps({'ok': True, 'preset': self.server.preset, 'active': name}).encode('utf-8'), no_cache=True)
+                    self._send(
+                        200,
+                        "application/json",
+                        json.dumps(
+                            {"ok": True, "preset": self.server.preset, "active": name}
+                        ).encode("utf-8"),
+                        no_cache=True,
+                    )
                     return None
-                self._send(404, 'application/json', b'{"ok":false}')
+                self._send(404, "application/json", b'{"ok":false}')
                 return None
-            if path == '/presets/del' and presets is not None:
-                name = (q.get('name') or '').strip()
+            if path == "/presets/del" and presets is not None:
+                name = (q.get("name") or "").strip()
                 presets.pop(name, None)
-                if getattr(self.server, 'preset_name', '') == name:
-                    self.server.preset_name = ''
+                if getattr(self.server, "preset_name", "") == name:
+                    self.server.preset_name = ""
                 self._persist_presets()
-                self._send(200, 'application/json', json.dumps({'ok': True, 'names': sorted(presets)}).encode('utf-8'), no_cache=True)
+                self._send(
+                    200,
+                    "application/json",
+                    json.dumps({"ok": True, "names": sorted(presets)}).encode("utf-8"),
+                    no_cache=True,
+                )
                 return None
-            self._send(404, 'text/plain', b'not found')
+            self._send(404, "text/plain", b"not found")
         except Exception:
             pass
 
@@ -1694,13 +1778,23 @@ class StreamOverlayServer:
     """Serves the OBS overlay off the live `ui` dict. Best-effort: start() never
     raises (a busy port just means no overlay this run)."""
 
-    def __init__(self, ui, port: int = DEFAULT_PORT, preset: dict = None, on_save=None, cfg=None, presets: dict = None, preset_name: str = '', on_persist=None):
+    def __init__(
+        self,
+        ui,
+        port: int = DEFAULT_PORT,
+        preset: dict = None,
+        on_save=None,
+        cfg=None,
+        presets: dict = None,
+        preset_name: str = "",
+        on_persist=None,
+    ):
         self.ui = ui
         self.port = int(port)
         self.preset = dict(DEFAULT_PRESET, **(preset or {}))
         self.on_save = on_save
         self.presets = dict(presets or {})
-        self.preset_name = preset_name or ''
+        self.preset_name = preset_name or ""
         self.on_persist = on_persist
         self.cfg = cfg
         self._bars = None
@@ -1709,11 +1803,11 @@ class StreamOverlayServer:
 
     @property
     def url(self) -> str:
-        return f'http://127.0.0.1:{self.port}/'
+        return f"http://127.0.0.1:{self.port}/"
 
     def start(self) -> bool:
         try:
-            self._httpd = ThreadingHTTPServer(('127.0.0.1', self.port), _Handler)
+            self._httpd = ThreadingHTTPServer(("127.0.0.1", self.port), _Handler)
             self._httpd.ui = self.ui
             self._httpd.preset = self.preset
             self._httpd.on_save = self.on_save
@@ -1723,11 +1817,14 @@ class StreamOverlayServer:
             if self.cfg is not None and self._bars is None:
                 try:
                     from fh6_spotify.overlay_bars import OverlayBars
+
                     self._bars = OverlayBars(self.cfg, ui=self.ui)
                 except Exception:
                     self._bars = None
             self._httpd.bars = self._bars
-            self._thread = threading.Thread(target=self._httpd.serve_forever, name='segue-overlay', daemon=True)
+            self._thread = threading.Thread(
+                target=self._httpd.serve_forever, name="segue-overlay", daemon=True
+            )
             self._thread.start()
             return True
         except Exception:

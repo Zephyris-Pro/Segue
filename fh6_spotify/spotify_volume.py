@@ -12,12 +12,12 @@ def _session_tokens(candidates):
     out = set()
     for c in candidates:
         t = c.lower()
-        if t.endswith('.exe'):
+        if t.endswith(".exe"):
             t = t[:-4]
         t = t.strip()
         if t:
             out.add(t)
-            out.add(t.replace(' ', ''))
+            out.add(t.replace(" ", ""))
     return out
 
 
@@ -39,8 +39,8 @@ def _session_matches(session, wanted, tokens):
         pass
     if tokens:
         try:
-            ident = (session._ctl.GetSessionInstanceIdentifier() or '').lower()
-            if any(t in ident or t in ident.replace(' ', '') for t in tokens):
+            ident = (session._ctl.GetSessionInstanceIdentifier() or "").lower()
+            if any(t in ident or t in ident.replace(" ", "") for t in tokens):
                 return True
         except Exception:
             pass
@@ -60,8 +60,13 @@ def _all_render_sessions():
         from pycaw.api.audiopolicy import IAudioSessionControl2, IAudioSessionManager2
         from pycaw.api.mmdeviceapi import IMMDeviceEnumerator
         from pycaw.constants import CLSID_MMDeviceEnumerator, EDataFlow, DEVICE_STATE
-        enum = comtypes.CoCreateInstance(CLSID_MMDeviceEnumerator, IMMDeviceEnumerator, comtypes.CLSCTX_INPROC_SERVER)
-        coll = enum.EnumAudioEndpoints(EDataFlow.eRender.value, DEVICE_STATE.ACTIVE.value)
+
+        enum = comtypes.CoCreateInstance(
+            CLSID_MMDeviceEnumerator, IMMDeviceEnumerator, comtypes.CLSCTX_INPROC_SERVER
+        )
+        coll = enum.EnumAudioEndpoints(
+            EDataFlow.eRender.value, DEVICE_STATE.ACTIVE.value
+        )
         sessions = []
         for i in range(coll.GetCount()):
             try:
@@ -84,6 +89,7 @@ def _all_render_sessions():
         pass
     try:
         from pycaw.pycaw import AudioUtilities
+
         return AudioUtilities.GetAllSessions()
     except Exception:
         return []
@@ -127,13 +133,13 @@ def _dirty_path() -> str:
     when Segue restores cleanly on exit). Shape:
         {"spotify.exe": 0.74, "chrome.exe": 0.62}
     """
-    base = os.environ.get('APPDATA') or os.path.expanduser('~')
-    return os.path.join(base, 'Segue', 'dirty_volumes.json')
+    base = os.environ.get("APPDATA") or os.path.expanduser("~")
+    return os.path.join(base, "Segue", "dirty_volumes.json")
 
 
 def _load_dirty() -> dict:
     try:
-        with open(_dirty_path(), 'r', encoding='utf-8') as f:
+        with open(_dirty_path(), "r", encoding="utf-8") as f:
             data = json.load(f)
         return data if isinstance(data, dict) else {}
     except (OSError, ValueError):
@@ -144,8 +150,8 @@ def _save_dirty(d: dict) -> None:
     path = _dirty_path()
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        tmp = path + '.tmp'
-        with open(tmp, 'w', encoding='utf-8') as f:
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
             json.dump(d, f, indent=2)
         os.replace(tmp, path)
     except OSError:
@@ -168,6 +174,7 @@ def restore_dirty_volumes() -> None:
     if not d:
         return
     from pycaw.pycaw import AudioUtilities
+
     try:
         sessions = AudioUtilities.GetAllSessions()
     except Exception:
@@ -203,32 +210,40 @@ class SpotifyVolume:
         self._pending_source = None
         self._pending_since = 0.0
 
-    def _candidates(self, source: str | None=None):
+    def _candidates(self, source: str | None = None):
         source = source if source is not None else self.c.source
-        if source == 'browser':
+        if source == "browser":
             return list(self.c.browser_process_names)
-        if source == 'applemusic':
-            return list(getattr(self.c, 'applemusic_process_names', ('AppleMusic.exe',)))
-        if source == 'localmedia':
-            return list(getattr(self.c, 'localmedia_process_names', ('vlc.exe', 'wmplayer.exe')))
-        if source == 'tidal':
-            return list(getattr(self.c, 'tidal_process_names', ('TIDAL.exe',)))
-        if source == 'amazonmusic':
-            return list(getattr(self.c, 'amazonmusic_process_names', ('Amazon Music.exe',)))
-        if source == 'ytmusic':
-            return list(getattr(self.c, 'ytmusic_process_names', ('YouTube Music.exe',)))
-        if source == 'custom':
-            return list(getattr(self.c, 'custom_process_names', ()))
+        if source == "applemusic":
+            return list(
+                getattr(self.c, "applemusic_process_names", ("AppleMusic.exe",))
+            )
+        if source == "localmedia":
+            return list(
+                getattr(self.c, "localmedia_process_names", ("vlc.exe", "wmplayer.exe"))
+            )
+        if source == "tidal":
+            return list(getattr(self.c, "tidal_process_names", ("TIDAL.exe",)))
+        if source == "amazonmusic":
+            return list(
+                getattr(self.c, "amazonmusic_process_names", ("Amazon Music.exe",))
+            )
+        if source == "ytmusic":
+            return list(
+                getattr(self.c, "ytmusic_process_names", ("YouTube Music.exe",))
+            )
+        if source == "custom":
+            return list(getattr(self.c, "custom_process_names", ()))
         return [self.c.spotify_process_name]
 
-    def _resolve(self, source: str | None=None):
+    def _resolve(self, source: str | None = None):
         src = source if source is not None else self.c.source
         cands = self._candidates(src)
         if self._lookup is not None:
             return self._lookup(cands)
         return _find_session(cands)
 
-    def _resolve_all(self, source: str | None=None):
+    def _resolve_all(self, source: str | None = None):
         """All matching session interfaces (for SETTING volume). Single-session
         sources (Spotify/browser) return one; Apple Music may return several."""
         src = source if source is not None else self.c.source
@@ -266,7 +281,7 @@ class SpotifyVolume:
         except Exception:
             return None
 
-    def _release(self, source: str, ramp_ms: int=0) -> None:
+    def _release(self, source: str, ramp_ms: int = 0) -> None:
         """Hand a source's app back to its pre-Segue volume. Falls back to
         1.0 (full) if we never recorded a snapshot, which matches the old
         behaviour of just "un-ducking" the app.
@@ -329,7 +344,7 @@ class SpotifyVolume:
             self._pending_source = src
         if level == self._last_applied:
             now = time.monotonic()
-            if now - getattr(self, '_audio_check_t', 0.0) >= 0.5:
+            if now - getattr(self, "_audio_check_t", 0.0) >= 0.5:
                 self._audio_check_t = now
                 self.has_audio = bool(self._resolve_all())
             return None

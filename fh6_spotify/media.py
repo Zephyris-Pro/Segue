@@ -4,6 +4,7 @@ Reads title / artist / play-state / cover art for whatever app is playing
 (Spotify), with no Spotify login. Runs an asyncio loop in its own thread and
 exposes a thread-safe snapshot via get().
 """
+
 import asyncio
 import threading
 from dataclasses import dataclass
@@ -16,8 +17,8 @@ class NowPlaying:
     is_playing: bool
     thumb: bytes | None
     shuffle: bool = False
-    repeat: str = 'none'
-    app: str = ''
+    repeat: str = "none"
+    app: str = ""
     position: float = 0.0
     duration: float = 0.0
 
@@ -26,8 +27,13 @@ _TRACK_HOLD_S = 2.0
 
 
 class MediaWatcher:
-
-    def __init__(self, poll_s: float=0.2, match=None, debug: bool=False, log_path: str | None=None):
+    def __init__(
+        self,
+        poll_s: float = 0.2,
+        match=None,
+        debug: bool = False,
+        log_path: str | None = None,
+    ):
         self._match = match
         self._poll_s = poll_s
         self._debug = debug
@@ -51,6 +57,7 @@ class MediaWatcher:
     def _cmd(self, make_coro):
         """Schedule an SMTC control coroutine on the watcher's loop (thread-safe)."""
         import asyncio
+
         if self._aloop is None or self._sess is None:
             return None
         try:
@@ -67,6 +74,7 @@ class MediaWatcher:
         title/cover lands with minimal added latency on top of the player's
         SMTC publish delay (~1s for Spotify, source-side)."""
         import time as _t
+
         self._boost_until = _t.monotonic() + 2.0
 
     def playpause(self) -> bool:
@@ -95,8 +103,9 @@ class MediaWatcher:
 
     def cycle_repeat(self) -> None:
         from winsdk.windows.media import MediaPlaybackAutoRepeatMode as M
-        order = {'none': M.LIST, 'list': M.TRACK, 'track': M.NONE}
-        cur = self._snapshot.repeat if self._snapshot else 'none'
+
+        order = {"none": M.LIST, "list": M.TRACK, "track": M.NONE}
+        cur = self._snapshot.repeat if self._snapshot else "none"
         self._cmd(lambda s: s.try_change_auto_repeat_mode_async(order.get(cur, M.LIST)))
 
     def start(self) -> None:
@@ -123,32 +132,39 @@ class MediaWatcher:
             if not self._log_path:
                 return
             import time as _t
-            with open(self._log_path, 'a', encoding='utf-8') as f:
+
+            with open(self._log_path, "a", encoding="utf-8") as f:
                 f.write(f"[{_t.strftime('%Y-%m-%d %H:%M:%S')}] {msg}\n")
         except Exception:
             return None
 
     def _run(self) -> None:
-        self._diag('media loop starting')
+        self._diag("media loop starting")
         try:
             import ctypes
+
             ctypes.windll.ole32.CoInitializeEx(None, 0)
         except Exception:
             pass
         try:
             asyncio.run(self._loop())
-            self._diag('media loop exited cleanly')
+            self._diag("media loop exited cleanly")
         except Exception:
             try:
                 import traceback
-                self._diag('FATAL media loop died:\n' + traceback.format_exc())
+
+                self._diag("FATAL media loop died:\n" + traceback.format_exc())
             except Exception:
                 return None
 
     async def _loop(self) -> None:
-        from winsdk.windows.media.control import GlobalSystemMediaTransportControlsSessionManager as Mgr, GlobalSystemMediaTransportControlsSessionPlaybackStatus as PStatus
+        from winsdk.windows.media.control import (
+            GlobalSystemMediaTransportControlsSessionManager as Mgr,
+            GlobalSystemMediaTransportControlsSessionPlaybackStatus as PStatus,
+        )
         from winsdk.windows.media import MediaPlaybackAutoRepeatMode as M
-        _REPEAT = {M.NONE: 'none', M.TRACK: 'track', M.LIST: 'list'}
+
+        _REPEAT = {M.NONE: "none", M.TRACK: "track", M.LIST: "list"}
         self._aloop = asyncio.get_running_loop()
         mgr = await Mgr.request_async()
         while not self._stop:
@@ -156,16 +172,25 @@ class MediaWatcher:
                 sess = self._pick_session(mgr)
                 self._sess = sess
                 import time as _t2
+
                 _now2 = _t2.monotonic()
                 cand = None
                 if sess is not None:
                     props = await sess.try_get_media_properties_async()
                     info = sess.get_playback_info()
-                    title = props.title or ''
-                    artist = props.artist or ''
+                    title = props.title or ""
+                    artist = props.artist or ""
                     playing = info.playback_status == PStatus.PLAYING
-                    shuffle = bool(info.is_shuffle_active) if info.is_shuffle_active is not None else False
-                    repeat = _REPEAT.get(info.auto_repeat_mode, 'none') if info.auto_repeat_mode is not None else 'none'
+                    shuffle = (
+                        bool(info.is_shuffle_active)
+                        if info.is_shuffle_active is not None
+                        else False
+                    )
+                    repeat = (
+                        _REPEAT.get(info.auto_repeat_mode, "none")
+                        if info.auto_repeat_mode is not None
+                        else "none"
+                    )
                     pos = dur = 0.0
                     try:
                         tl = sess.get_timeline_properties()
@@ -175,23 +200,33 @@ class MediaWatcher:
                             pos = max(0.0, tl.position.total_seconds() - st)
                     except Exception:
                         pass
-                    sid = sess.source_app_user_model_id or ''
-                    track = f'{sid}|{artist}—{title}'
+                    sid = sess.source_app_user_model_id or ""
+                    track = f"{sid}|{artist}—{title}"
                     if track != self._last_track:
                         self._last_track = track
                         self._thumb_not_before = _now2 + 0.3
                         self._thumb_settle = _now2 + 8.0
                         self._boost_until = _now2 + 5.0
-                    if _now2 >= getattr(self, '_thumb_not_before', 0.0):
-                        if _now2 >= getattr(self, '_thumb_read_next', 0.0):
+                    if _now2 >= getattr(self, "_thumb_not_before", 0.0):
+                        if _now2 >= getattr(self, "_thumb_read_next", 0.0):
                             self._thumb_read_next = _now2 + 0.12
                             nt = await self._read_thumb(props.thumbnail)
                             if nt is not None:
                                 if nt != self._thumb:
                                     self._thumb = nt
-                            elif _now2 >= getattr(self, '_thumb_settle', 0.0):
+                            elif _now2 >= getattr(self, "_thumb_settle", 0.0):
                                 self._thumb = None
-                    cand = NowPlaying(title, artist, playing, self._thumb, shuffle, repeat, app=sid, position=pos, duration=dur)
+                    cand = NowPlaying(
+                        title,
+                        artist,
+                        playing,
+                        self._thumb,
+                        shuffle,
+                        repeat,
+                        app=sid,
+                        position=pos,
+                        duration=dur,
+                    )
                 _empty = cand is None or (not cand.title and not cand.artist)
                 if not _empty:
                     self._last_good = cand
@@ -205,7 +240,10 @@ class MediaWatcher:
             except Exception:
                 pass
             import time as _t
-            await asyncio.sleep(0.05 if _t.monotonic() < self._boost_until else self._poll_s)
+
+            await asyncio.sleep(
+                0.05 if _t.monotonic() < self._boost_until else self._poll_s
+            )
 
     def _pick_session(self, mgr):
         """Session for the chosen source. With no matcher, the current session.
@@ -219,12 +257,12 @@ class MediaWatcher:
             self._any_session = sessions.size > 0
             for i in range(sessions.size):
                 s = sessions.get_at(i)
-                sid = s.source_app_user_model_id or ''
+                sid = s.source_app_user_model_id or ""
                 all_ids.append(sid)
                 if self._match is None or self._match(sid):
                     if matched is None:
                         matched = s
-                    if preferred is None and 'spotify' in sid.lower():
+                    if preferred is None and "spotify" in sid.lower():
                         preferred = s
         except Exception:
             pass
@@ -244,14 +282,15 @@ class MediaWatcher:
             if key == self._logged_ids or not self._log_path:
                 return None
             self._logged_ids = key
-            chosen_id = ''
+            chosen_id = ""
             try:
-                chosen_id = (chosen.source_app_user_model_id or '') if chosen else ''
+                chosen_id = (chosen.source_app_user_model_id or "") if chosen else ""
             except Exception:
                 pass
             import time as _t
+
             line = f"[{_t.strftime('%Y-%m-%d %H:%M:%S')}] sessions={ids!r} picked={chosen_id!r}\n"
-            with open(self._log_path, 'a', encoding='utf-8') as f:
+            with open(self._log_path, "a", encoding="utf-8") as f:
                 f.write(line)
         except Exception:
             return None
@@ -261,6 +300,7 @@ class MediaWatcher:
             return
         try:
             from winsdk.windows.storage.streams import DataReader
+
             stream = await ref.open_read_async()
             size = stream.size
             if not size:

@@ -17,37 +17,45 @@ media player" has no single right target, so the caller just tells the user.
 The public entry point `launch_source` takes injectable seams (running / finder
 / opener) so the resolution logic is unit-tested without touching the OS.
 """
+
 import os
 from collections import namedtuple
-LaunchResult = namedtuple('LaunchResult', 'status display detail')
-_RECIPES = {'spotify': ('Spotify', ['Spotify'], 'spotify:'), 'applemusic': ('Apple Music', ['Apple Music'], None), 'tidal': ('TIDAL', ['TIDAL'], 'tidal://'), 'amazonmusic': ('Amazon Music', ['Amazon Music'], None), 'ytmusic': ('YouTube Music', ['YouTube Music'], None)}
-_UNSUPPORTED = {'browser': 'your browser', 'localmedia': 'your media player'}
+
+LaunchResult = namedtuple("LaunchResult", "status display detail")
+_RECIPES = {
+    "spotify": ("Spotify", ["Spotify"], "spotify:"),
+    "applemusic": ("Apple Music", ["Apple Music"], None),
+    "tidal": ("TIDAL", ["TIDAL"], "tidal://"),
+    "amazonmusic": ("Amazon Music", ["Amazon Music"], None),
+    "ytmusic": ("YouTube Music", ["YouTube Music"], None),
+}
+_UNSUPPORTED = {"browser": "your browser", "localmedia": "your media player"}
 
 
 def _norm(s: str) -> str:
     """Lowercase, alphanumeric-only, for fuzzy shortcut/name matching."""
-    return ''.join(ch for ch in s.lower() if ch.isalnum())
+    return "".join(ch for ch in s.lower() if ch.isalnum())
 
 
 def recipe_for(config):
     """(display, [start-menu name candidates], protocol) for the config's source.
     Custom resolves from the saved label + the exe base of its process names.
     Returns (None, [], None) for unsupported / unknown sources."""
-    src = getattr(config, 'source', 'spotify')
+    src = getattr(config, "source", "spotify")
     if src in _RECIPES:
         return _RECIPES[src]
-    if src == 'custom':
-        label = getattr(config, 'custom_label', '') or 'your source'
+    if src == "custom":
+        label = getattr(config, "custom_label", "") or "your source"
         names = [label]
-        for exe in getattr(config, 'custom_process_names', ()):
-            base = exe[:-4] if exe.lower().endswith('.exe') else exe
+        for exe in getattr(config, "custom_process_names", ()):
+            base = exe[:-4] if exe.lower().endswith(".exe") else exe
             if base and base not in names:
                 names.append(base)
         return (label, names, None)
     return (None, [], None)
 
 
-_LAUNCH_IGNORE_PROCS = {'amplibraryagent.exe'}
+_LAUNCH_IGNORE_PROCS = {"amplibraryagent.exe"}
 
 
 def _source_candidates(config):
@@ -55,6 +63,7 @@ def _source_candidates(config):
     Segue ducks, minus pure background agents (see _LAUNCH_IGNORE_PROCS) so a
     lingering helper doesn't make quick-launch think the app is already up."""
     from fh6_spotify.spotify_volume import SpotifyVolume
+
     names = SpotifyVolume(config)._candidates()
     ui = [n for n in names if n and n.lower() not in _LAUNCH_IGNORE_PROCS]
     return ui or names
@@ -69,10 +78,11 @@ def source_running(config, names=None, proc_names=None) -> bool:
         return False
     if proc_names is None:
         import psutil
+
         proc_names = []
-        for p in psutil.process_iter(['name']):
+        for p in psutil.process_iter(["name"]):
             try:
-                proc_names.append(p.info.get('name') or '')
+                proc_names.append(p.info.get("name") or "")
             except Exception:
                 pass
     return any(nm and nm.lower() in wanted for nm in proc_names)
@@ -80,10 +90,12 @@ def source_running(config, names=None, proc_names=None) -> bool:
 
 def _start_menu_roots():
     roots = []
-    for env in ('APPDATA', 'PROGRAMDATA'):
+    for env in ("APPDATA", "PROGRAMDATA"):
         base = os.environ.get(env)
         if base:
-            roots.append(os.path.join(base, 'Microsoft', 'Windows', 'Start Menu', 'Programs'))
+            roots.append(
+                os.path.join(base, "Microsoft", "Windows", "Start Menu", "Programs")
+            )
     return roots
 
 
@@ -91,7 +103,7 @@ def _walk_lnks():
     for root in _start_menu_roots():
         for dirpath, _dirs, files in os.walk(root):
             for f in files:
-                if f.lower().endswith('.lnk'):
+                if f.lower().endswith(".lnk"):
                     yield os.path.join(dirpath, f)
 
 
@@ -128,16 +140,33 @@ def _resolve_aumid(name_candidates):
         return
     import json
     import subprocess
+
     try:
-        out = subprocess.run(['powershell', '-NoProfile', '-NonInteractive', '-Command', 'Get-StartApps | Select-Object Name,AppID | ConvertTo-Json -Compress'], capture_output=True, text=True, timeout=8, creationflags=134217728)
-        data = json.loads(out.stdout or 'null')
+        out = subprocess.run(
+            [
+                "powershell",
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                "Get-StartApps | Select-Object Name,AppID | ConvertTo-Json -Compress",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=8,
+            creationflags=134217728,
+        )
+        data = json.loads(out.stdout or "null")
     except Exception:
         return
     if isinstance(data, dict):
         data = [data]
     if not isinstance(data, list):
         return
-    entries = [(_norm(e.get('Name', '')), e.get('AppID', '')) for e in data if isinstance(e, dict) and e.get('AppID')]
+    entries = [
+        (_norm(e.get("Name", "")), e.get("AppID", ""))
+        for e in data
+        if isinstance(e, dict) and e.get("AppID")
+    ]
     for nm, aid in entries:
         if nm in targets:
             return aid
@@ -153,13 +182,14 @@ def _steam_root():
     falling back to the default Program Files locations. None if Steam isn't found."""
     try:
         import winreg
-        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, 'Software\\Valve\\Steam') as k:
-            p = winreg.QueryValueEx(k, 'SteamPath')[0]
+
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Software\\Valve\\Steam") as k:
+            p = winreg.QueryValueEx(k, "SteamPath")[0]
             if p and os.path.isdir(p):
                 return p
     except Exception:
         pass
-    for d in ('C:\\Program Files (x86)\\Steam', 'C:\\Program Files\\Steam'):
+    for d in ("C:\\Program Files (x86)\\Steam", "C:\\Program Files\\Steam"):
         if os.path.isdir(d):
             return d
     return None
@@ -180,20 +210,21 @@ def _resolve_steam_appid(name_candidates):
         return
     import re
     import glob
-    libs = [os.path.join(root, 'steamapps')]
+
+    libs = [os.path.join(root, "steamapps")]
     try:
-        vdf = os.path.join(root, 'steamapps', 'libraryfolders.vdf')
-        txt = open(vdf, encoding='utf-8', errors='ignore').read()
+        vdf = os.path.join(root, "steamapps", "libraryfolders.vdf")
+        txt = open(vdf, encoding="utf-8", errors="ignore").read()
         for m in re.finditer('"path"\\s*"([^"]+)"', txt):
-            p = os.path.join(m.group(1).replace('\\\\', '\\'), 'steamapps')
+            p = os.path.join(m.group(1).replace("\\\\", "\\"), "steamapps")
             if p not in libs:
                 libs.append(p)
     except Exception:
         pass
     for lib in libs:
-        for acf in glob.glob(os.path.join(lib, 'appmanifest_*.acf')):
+        for acf in glob.glob(os.path.join(lib, "appmanifest_*.acf")):
             try:
-                txt = open(acf, encoding='utf-8', errors='ignore').read()
+                txt = open(acf, encoding="utf-8", errors="ignore").read()
             except Exception:
                 continue
             nm = re.search('"name"\\s*"([^"]+)"', txt)
@@ -214,6 +245,7 @@ def _open_appsfolder(aumid):
     COM-init this thread and grant foreground rights first so the app can come up.
     Falls back to os.startfile if the COM activator is unavailable."""
     import ctypes
+
     try:
         ctypes.windll.user32.AllowSetForegroundWindow(-1)
     except Exception:
@@ -223,18 +255,32 @@ def _open_appsfolder(aumid):
         from comtypes import GUID, IUnknown, COMMETHOD, HRESULT
         from ctypes import POINTER, c_wchar_p, c_int, c_uint
         import comtypes.client
+
         try:
             comtypes.CoInitialize()
         except Exception:
             pass
 
         class _IAppActivationMgr(IUnknown):
-            _iid_ = GUID('{2e941141-7f97-4756-ba1d-9decde894a3d}')
-            _methods_ = [COMMETHOD([], HRESULT, 'ActivateApplication', (['in'], c_wchar_p, 'appUserModelId'), (['in'], c_wchar_p, 'arguments'), (['in'], c_int, 'options'), (['out'], POINTER(c_uint), 'processId'))]
-        mgr = comtypes.client.CreateObject(GUID('{45BA127D-10A8-46EA-8AB7-56EA9078943C}'), interface=_IAppActivationMgr)
+            _iid_ = GUID("{2e941141-7f97-4756-ba1d-9decde894a3d}")
+            _methods_ = [
+                COMMETHOD(
+                    [],
+                    HRESULT,
+                    "ActivateApplication",
+                    (["in"], c_wchar_p, "appUserModelId"),
+                    (["in"], c_wchar_p, "arguments"),
+                    (["in"], c_int, "options"),
+                    (["out"], POINTER(c_uint), "processId"),
+                )
+            ]
+
+        mgr = comtypes.client.CreateObject(
+            GUID("{45BA127D-10A8-46EA-8AB7-56EA9078943C}"), interface=_IAppActivationMgr
+        )
         mgr.ActivateApplication(aumid, None, 0)
     except Exception:
-        os.startfile('shell:AppsFolder\\' + aumid)
+        os.startfile("shell:AppsFolder\\" + aumid)
 
 
 def _open_minimized(target):
@@ -243,7 +289,8 @@ def _open_minimized(target):
     Segue. Falls back to os.startfile if ShellExecute isn't available."""
     try:
         import ctypes
-        rv = ctypes.windll.shell32.ShellExecuteW(None, 'open', target, None, None, 7)
+
+        rv = ctypes.windll.shell32.ShellExecuteW(None, "open", target, None, None, 7)
         if int(rv) <= 32:
             os.startfile(target)
     except Exception:
@@ -260,6 +307,7 @@ def _foreground_by_title(needles) -> bool:
     so SetForegroundWindow is allowed."""
     import ctypes
     from ctypes import wintypes
+
     u = ctypes.windll.user32
     needles = [n.lower() for n in needles if n]
     if not needles:
@@ -281,6 +329,7 @@ def _foreground_by_title(needles) -> bool:
         if any(nd in t for nd in needles):
             found.append(hwnd)
         return True
+
     u.EnumWindows(_cb, 0)
     if not found:
         return False
@@ -296,7 +345,16 @@ def _foreground_by_title(needles) -> bool:
     return True
 
 
-def launch_source(config, *, to_front=None, running=None, finder=None, opener=None, aumid_finder=None, app_opener=None):
+def launch_source(
+    config,
+    *,
+    to_front=None,
+    running=None,
+    finder=None,
+    opener=None,
+    aumid_finder=None,
+    app_opener=None,
+):
     """Open the config's source app. Returns a LaunchResult. Seams:
       running(config) -> bool, finder(names) -> path|None, opener(target) -> None,
       aumid_finder(names) -> aumid|None, app_opener(aumid) -> None.
@@ -307,14 +365,17 @@ def launch_source(config, *, to_front=None, running=None, finder=None, opener=No
     brings a running app to the front (or launches it up front when it's off).
     """
     display, names, protocol = recipe_for(config)
-    src = getattr(config, 'source', 'spotify')
+    src = getattr(config, "source", "spotify")
     if src in _UNSUPPORTED or display is None:
-        return LaunchResult('unsupported', _UNSUPPORTED.get(src, display or 'your source'), '')
+        return LaunchResult(
+            "unsupported", _UNSUPPORTED.get(src, display or "your source"), ""
+        )
     if not to_front and (running or source_running)(config):
-        return LaunchResult('running', display, '')
+        return LaunchResult("running", display, "")
     if to_front:
         try:
             import ctypes
+
             ctypes.windll.user32.AllowSetForegroundWindow(-1)
         except Exception:
             pass
@@ -323,20 +384,20 @@ def launch_source(config, *, to_front=None, running=None, finder=None, opener=No
     if lnk:
         try:
             _open(lnk)
-            return LaunchResult('launched', display, lnk)
+            return LaunchResult("launched", display, lnk)
         except Exception:
             pass
     aumid = (aumid_finder or _resolve_aumid)(names)
     if aumid:
         try:
             (app_opener or _open_appsfolder)(aumid)
-            return LaunchResult('launched', display, aumid)
+            return LaunchResult("launched", display, aumid)
         except Exception:
             pass
     if protocol:
         try:
             _open(protocol)
-            return LaunchResult('launched', display, protocol)
+            return LaunchResult("launched", display, protocol)
         except Exception:
             pass
-    return LaunchResult('not_found', display, '')
+    return LaunchResult("not_found", display, "")
