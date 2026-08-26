@@ -2,9 +2,7 @@ name: Build Windows executable
 
 on:
   push:
-    branches: ["**"]
-    tags: ["v*.*.*", "v*.*.*.*"]
-  pull_request:
+    tags: ["v*"]
   workflow_dispatch:
 
 permissions:
