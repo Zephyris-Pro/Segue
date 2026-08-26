@@ -938,7 +938,8 @@ def start_runtime(c: Config, ui: dict):
             print(f"  vol HUD disabled: {exc}")
     except Exception as exc:
         print(f"  overlay disabled: {exc}")
-    threading.Thread(target=radio_loop, daemon=True).start()
+    _radio_thread = threading.Thread(target=radio_loop, daemon=True)
+    _radio_thread.start()
     _stopped = threading.Event()
 
     def stop(restore: bool = True):
@@ -946,6 +947,13 @@ def start_runtime(c: Config, ui: dict):
             return
         _stopped.set()
         stop_event.set()
+        # Fix 1:
+        # Wait for the in-flight tick (if any) to finish before anything below
+        # runs - otherwise a straggler volume.apply() from that tick can land
+        # after _release() restores the volume, silently re-ducking it right
+        # as the process exits (it never gets un-stuck since Windows persists
+        # the per-app level once Segue is gone).
+        _radio_thread.join(timeout=1.0)
         _stop_speech_worker()
         if controller:
             controller.close()
