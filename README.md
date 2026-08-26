@@ -1,7 +1,9 @@
 # Segue Decompilation Project
 
-> [!WARNING]  
+> [!WARNING]
 > This is not the real project. The actual project can be found here: [Segueapp/segue-releases](https://github.com/Segueapp/segue-releases)
+>
+>> As of today (08/26/2026) it seems like Segue has gone quiet, so I’m taking the liberty of bringing the project back to life by trying to fix the bugs and potentially add some new features.
 
 ## Why does this project exist?
 
@@ -21,11 +23,8 @@ I can claim the code matches the original because the bytecode of the decompiled
 
 ## What's missing, and will it be finished?
 
-`settings.pyc` is a large file (~800 KB) that includes HTML and CSS. It will be reversed eventually, but for now the focus is on the other modules.
+Nothing is missing. Everything has been reverse-engineered. I’ll therefore focus on fixing bugs and potentially adding some new features.
 
-Some of these files are trickier to reverse, and I’ll work through them in my spare time.
-
-~~Still missing:~~
 
 > [!IMPORTANT]
 > Despite the tests I have carried out, it is possible that the decompilation is not perfect and could still contain bugs. A broader range of tests, or people dedicated to this task, would be needed, and their help would be appreciated.
@@ -34,7 +33,9 @@ Some of these files are trickier to reverse, and I’ll work through them in my 
 
 ## Preview
 
-<img width="auto" alt="preview" src="https://github.com/user-attachments/assets/de2b9be1-c7c1-4ec4-98bd-a3ab6557dda4" />
+<img width="auto" alt="preview" src="https://github.com/user-attachments/assets/3a6c42a1-7242-4b29-9272-5d334a7bce1e"/>
+<br>
+<br>
 
 
 All credit goes to the original Segue creator. I claim none of it.
