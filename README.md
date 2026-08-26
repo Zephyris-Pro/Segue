@@ -32,6 +32,11 @@ Some of these files are trickier to reverse, and I’ll work through them in my 
  
 ***
 
+## Preview
+
+<img width="auto" alt="preview" src="https://github.com/user-attachments/assets/de2b9be1-c7c1-4ec4-98bd-a3ab6557dda4" />
+
+
 All credit goes to the original Segue creator. I claim none of it.
 
 Stay safe.
