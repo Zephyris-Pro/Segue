@@ -20,34 +20,30 @@ jobs:
         with:
           python-version: "3.12"
           cache: "pip"
-          cache-dependency-path: app/requirements.txt
+          cache-dependency-path: requirements.txt
 
       - name: Install dependencies
-        working-directory: app
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
 
       - name: Build with PyInstaller
-        working-directory: app
         run: pyinstaller --noconfirm --clean Segue.spec
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: Segue-win64
-          path: app/dist/Segue
+          path: dist/Segue
           if-no-files-found: error
 
       - name: Package release artifact
         if: startsWith(github.ref, 'refs/tags/v')
-        working-directory: app
         run: Compress-Archive -Path dist/Segue/* -DestinationPath dist/Segue-win64.zip
 
       - name: Generate SHA256 checksum
         if: startsWith(github.ref, 'refs/tags/v')
-        working-directory: app
         run: |
           $hash = (Get-FileHash -Path dist/Segue-win64.zip -Algorithm SHA256).Hash
           "$hash  Segue-win64.zip" | Out-File -FilePath dist/Segue-win64.zip.sha256 -Encoding ascii
@@ -58,5 +54,5 @@ jobs:
         with:
           generate_release_notes: true
           files: |
-            app/dist/Segue-win64.zip
-            app/dist/Segue-win64.zip.sha256
+            dist/Segue-win64.zip
+            dist/Segue-win64.zip.sha256
